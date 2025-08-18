@@ -2,9 +2,9 @@ import React from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import { type RabDocument, type PriceDatabaseItem, type WorkItem } from '../../types';
 
-interface RabLayoutProps {
-    rabData: RabDocument[];
-    setRabData: React.Dispatch<React.SetStateAction<RabDocument[]>>;
+interface BqLayoutProps {
+    bqData: RabDocument[];
+    setBqData: React.Dispatch<React.SetStateAction<RabDocument[]>>;
     priceDatabase: PriceDatabaseItem[];
     setPriceDatabase: React.Dispatch<React.SetStateAction<PriceDatabaseItem[]>>;
     workItems: WorkItem[];
@@ -15,7 +15,7 @@ interface RabLayoutProps {
     setWorkCategories: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
-const RabLayout = (props: RabLayoutProps) => {
+const BqLayout = (props: BqLayoutProps) => {
     const tabClasses = ({ isActive }: { isActive: boolean }): string =>
         `px-4 py-2 font-semibold text-sm rounded-md transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         isActive
@@ -26,13 +26,13 @@ const RabLayout = (props: RabLayoutProps) => {
   return (
     <div className="space-y-6">
        <div>
-            <h1 className="text-3xl font-bold text-foreground">Monitoring RAB</h1>
-            <p className="text-muted-foreground mt-1">Buat, lihat, dan kelola Rencana Anggaran Biaya proyek.</p>
+            <h1 className="text-3xl font-bold text-foreground">Monitoring BQ</h1>
+            <p className="text-muted-foreground mt-1">Buat, lihat, dan kelola Bill of Quantity proyek.</p>
         </div>
         <div className="flex space-x-2 p-1 bg-muted rounded-lg">
-            <ReactRouterDOM.NavLink to="dashboard" className={tabClasses}>Dashboard RAB</ReactRouterDOM.NavLink>
-            <ReactRouterDOM.NavLink to="daftar" className={tabClasses}>Daftar RAB</ReactRouterDOM.NavLink>
-            <ReactRouterDOM.NavLink to="database" className={tabClasses}>Database Harga</ReactRouterDOM.NavLink>
+            <ReactRouterDOM.NavLink to="dashboard" className={tabClasses}>Dashboard BQ</ReactRouterDOM.NavLink>
+            <ReactRouterDOM.NavLink to="daftar" className={tabClasses}>Daftar BQ</ReactRouterDOM.NavLink>
+            <ReactRouterDOM.NavLink to="database" className={tabClasses}>Database Pekerjaan</ReactRouterDOM.NavLink>
         </div>
         <div>
             <ReactRouterDOM.Outlet context={{ ...props }} />
@@ -41,4 +41,4 @@ const RabLayout = (props: RabLayoutProps) => {
   );
 };
 
-export default RabLayout;
+export default BqLayout;

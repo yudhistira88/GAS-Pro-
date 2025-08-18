@@ -19,12 +19,15 @@ const ApprovalModal = ({ isOpen, onClose, onSend, rab, pdfDataUri }: ApprovalMod
 
     useEffect(() => {
         if (rab) {
+            const isBq = rab.eMPR.toUpperCase().startsWith('BQ');
+            const docType = isBq ? 'BQ' : 'RAB';
+            const docName = isBq ? 'Bill of Quantity (BQ)' : 'Rencana Anggaran Biaya (RAB)';
             const senderName = rab.creatorName || "Tim Proyek";
-            setSubject(`Approval RAB`);
+            setSubject(`Approval ${docType} - ${rab.projectName}`);
             setBody(
 `Yth. Bapak/Ibu,
 
-Bersama ini kami sampaikan Rencana Anggaran Biaya (RAB) untuk proyek "${rab.projectName}" dengan detail sebagaimana terlampir.
+Bersama ini kami sampaikan ${docName} untuk proyek "${rab.projectName}" dengan detail sebagaimana terlampir.
 
 Mohon dapat direview dan di-approve untuk kelanjutan proses berikutnya.
 
@@ -52,11 +55,13 @@ ${senderName}`
 
     if (!isOpen || !rab) return null;
 
+    const docType = rab.eMPR.toUpperCase().startsWith('BQ') ? 'BQ' : 'RAB';
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex justify-center items-center p-4" onClick={onClose}>
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 w-full max-w-4xl relative animate-fade-in-up flex flex-col" style={{ height: '90vh' }} onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-700"><X size={24} /></button>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Kirim RAB untuk Approval</h3>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Kirim {docType} untuk Approval</h3>
                 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-grow min-h-0">
                     {/* Left: Form */}

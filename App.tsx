@@ -1,27 +1,38 @@
-
 import React, { useState, useContext } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import Header from './components/Header';
+import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
+// BQ Imports
+import BqLayout from './pages/bq/BqLayout';
+import BqDashboard from './pages/bq/BqDashboard';
+import BqList from './pages/bq/BqList';
+import BqDetail from './pages/bq/BqDetail';
+// RAB Imports
 import RabLayout from './pages/rab/RabLayout';
 import RabDashboard from './pages/rab/RabDashboard';
 import RabList from './pages/rab/RabList';
+import RabDetail from './pages/rab/RabDetail';
+import PriceDatabase from './pages/rab/PriceDatabase';
+// Project Imports
 import ProjectLayout from './pages/project/ProjectLayout';
 import ProjectDashboard from './pages/project/ProjectDashboard';
 import ProjectList from './pages/project/ProjectList';
-import { type RabDocument, type Project, type PriceDatabaseItem, type WorkItem } from './types';
-import RabDetail from './pages/rab/RabDetail';
-import PriceDatabase from './pages/rab/PriceDatabase';
 import ProjectDetail from './pages/project/ProjectDetail';
+// Admin Imports
 import AdminLayout from './pages/admin/AdminLayout';
 import AdminPage from './pages/admin/AdminPage';
 import UserManagement from './pages/admin/UserManagement';
 import SystemLog from './pages/admin/SystemLog';
+// Other page imports
 import NotificationsPage from './pages/NotificationsPage';
 import LoginPage from './pages/LoginPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ProfilePage from './pages/ProfilePage';
+// Util imports
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthContext } from './contexts/AuthContext';
+import { type RabDocument, type Project, type PriceDatabaseItem, type WorkItem } from './types';
 
 
 const initialRabData: RabDocument[] = [
@@ -38,6 +49,9 @@ const initialRabData: RabDocument[] = [
   { id: '4', eMPR: 'RAB004', projectName: 'Proyek Renovasi dan Perbaikan Gedung Utama', pic: 'Andi', approvedDate: null, receivedRejectedDate: '2023-07-15', finishDate: null, status: 'Rejected', tenderValue: null, keterangan: 'Anggaran melebihi budget kuartal ini.', sla: 0, pdfReady: false, detailItems: [] },
   { id: '5', eMPR: 'RAB005', projectName: 'Implementasi Sistem ERP Gudang Terpusat', pic: 'Doni', approvedDate: '2023-08-10', receivedRejectedDate: '2023-08-01', finishDate: null, status: 'Approved', tenderValue: 345000000, keterangan: 'Fase 1 sedang berjalan.', sla: 0, pdfReady: false, detailItems: [] },
 ];
+
+// I'll create a separate initial data for BQ, just changing the eMPR for now.
+const initialBqData: RabDocument[] = JSON.parse(JSON.stringify(initialRabData)).map((item: RabDocument) => ({...item, eMPR: item.eMPR.replace('RAB', 'BQ')}));
 
 const initialProjects: Project[] = [
     { 
@@ -89,20 +103,23 @@ initialRabData.forEach(rab => {
 });
 
 
-// Define a layout component that includes the Header and main structure
 const MainLayout = () => {
   const { currentUser } = useContext(AuthContext);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   if (!currentUser) {
      return <ReactRouterDOM.Navigate to="/login" />;
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-100 dark:bg-gray-900 font-sans transition-colors duration-300">
-      <Header />
-      <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-6 md:p-8">
-        <ReactRouterDOM.Outlet />
-      </main>
+    <div className="min-h-screen bg-background text-foreground">
+      <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
+      <div className="lg:pl-64 flex flex-col flex-1">
+        <Header onMenuClick={() => setSidebarOpen(true)} />
+        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+          <ReactRouterDOM.Outlet />
+        </main>
+      </div>
     </div>
   );
 };
@@ -110,6 +127,7 @@ const MainLayout = () => {
 
 const App = () => {
   const [rabData, setRabData] = useState<RabDocument[]>(initialRabData);
+  const [bqData, setBqData] = useState<RabDocument[]>(initialBqData); // New state for BQ
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [priceDatabase, setPriceDatabase] = useState<PriceDatabaseItem[]>(initialPriceDatabase);
   const [workItems, setWorkItems] = useState<WorkItem[]>(initialWorkItems);
@@ -121,14 +139,28 @@ const App = () => {
   return (
     <ReactRouterDOM.Routes>
        <ReactRouterDOM.Route path="/login" element={<LoginPage />} />
+       <ReactRouterDOM.Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
       {/* Routes with the main header and layout */}
       <ReactRouterDOM.Route element={<MainLayout />}>
         <ReactRouterDOM.Route path="/" element={<ReactRouterDOM.Navigate replace to="/dashboard" />} />
-        <ReactRouterDOM.Route path="/dashboard" element={<Dashboard projects={projects} rabData={rabData} />} />
+        <ReactRouterDOM.Route path="/dashboard" element={<Dashboard projects={projects} rabData={rabData} bqData={bqData} />} />
         <ReactRouterDOM.Route path="/notifications" element={<NotificationsPage />} />
         <ReactRouterDOM.Route path="/profile" element={<ProfilePage />} />
         
+        {/* BQ Routes */}
+        <ReactRouterDOM.Route path="/bq" element={
+          <ProtectedRoute disallowedRoles={['OBM', 'Purchasing']}>
+            <BqLayout bqData={bqData} setBqData={setBqData} priceDatabase={priceDatabase} setPriceDatabase={setPriceDatabase} workItems={workItems} setWorkItems={setWorkItems} priceCategories={priceCategories} setPriceCategories={setPriceCategories} workCategories={workCategories} setWorkCategories={setWorkCategories}/>
+          </ProtectedRoute>
+        }>
+          <ReactRouterDOM.Route index element={<ReactRouterDOM.Navigate replace to="dashboard" />} />
+          <ReactRouterDOM.Route path="dashboard" element={<BqDashboard />} />
+          <ReactRouterDOM.Route path="daftar" element={<BqList />} />
+          <ReactRouterDOM.Route path="database" element={<PriceDatabase />} />
+        </ReactRouterDOM.Route>
+
+        {/* RAB Routes */}
         <ReactRouterDOM.Route path="/rab" element={
           <ProtectedRoute disallowedRoles={['OBM', 'Purchasing']}>
             <RabLayout rabData={rabData} setRabData={setRabData} priceDatabase={priceDatabase} setPriceDatabase={setPriceDatabase} workItems={workItems} setWorkItems={setWorkItems} priceCategories={priceCategories} setPriceCategories={setPriceCategories} workCategories={workCategories} setWorkCategories={setWorkCategories}/>
@@ -171,6 +203,23 @@ const App = () => {
         </ReactRouterDOM.Route>
 
       </ReactRouterDOM.Route>
+
+      {/* Full-screen route for BQ Detail, without the MainLayout */}
+      <ReactRouterDOM.Route 
+        path="/bq/detail/:bqId" 
+        element={
+          <ProtectedRoute disallowedRoles={['OBM', 'Purchasing']}>
+            <BqDetail 
+              bqData={bqData} 
+              setBqData={setBqData} 
+              priceDatabase={priceDatabase} 
+              setPriceDatabase={setPriceDatabase}
+              workItems={workItems}
+              setWorkItems={setWorkItems}
+            />
+          </ProtectedRoute>
+        } 
+      />
 
       {/* Full-screen route for RAB Detail, without the MainLayout */}
       <ReactRouterDOM.Route 

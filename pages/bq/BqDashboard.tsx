@@ -4,25 +4,18 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Legend, Tooltip, BarChart, Ba
 import { FileText, DollarSign, Target, CheckCircle, Clock, TrendingUp, TrendingDown, Filter, Plus, Download, X as XIcon, Edit } from 'lucide-react';
 import { ThemeContext } from '../../contexts/ThemeContext';
 import { type RabDocument } from '../../types';
-import CreateRabModal from '../../components/CreateRabModal';
+import CreateBqModal from '../../components/CreateBqModal';
 import StatCard from '../../components/StatCard';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-interface RabDataContext {
-  rabData: RabDocument[];
-  setRabData: React.Dispatch<React.SetStateAction<RabDocument[]>>;
+interface BqDataContext {
+  bqData: RabDocument[];
+  setBqData: React.Dispatch<React.SetStateAction<RabDocument[]>>;
 }
 
 // Helper functions
-const calculateTotalBudget = (doc: RabDocument) => doc.detailItems.reduce((sum, item) => sum + (item.volume * item.hargaSatuan), 0);
-const formatCurrency = (amount: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(amount);
-const formatShortCurrency = (num: number) => {
-    if (num >= 1e9) return (num / 1e9).toFixed(1).replace('.', ',') + ' M';
-    if (num >= 1e6) return (num / 1e6).toFixed(1).replace('.', ',') + ' Jt';
-    return new Intl.NumberFormat('id-ID').format(num);
-};
 const holidays = [
   "2023-01-01", "2023-01-22", "2023-01-23", "2023-02-18", "2023-03-22", "2023-03-23", "2023-04-07", "2023-04-22", "2023-04-23", "2023-04-19", "2023-04-20", "2023-04-21", "2023-04-24", "2023-04-25", "2023-05-01", "2023-05-18", "2023-06-01", "2023-06-2", "2023-06-04", "2023-06-29", "2023-07-19", "2023-08-17", "2023-09-28", "2023-12-25", "2023-12-26",
   "2024-01-01", "2024-02-08", "2024-02-09", "2024-02-10", "2024-03-11", "2024-03-12", "2024-03-29", "2024-03-31", "2024-04-10", "2024-04-11", "2024-04-08", "2024-04-09", "2024-04-12", "2024-04-15", "2024-05-01", "2024-05-09", "2024-05-10", "2024-05-23", "2024-05-24", "2024-06-01", "2024-06-17", "2024-06-18", "2024-07-07", "2024-08-17", "2024-09-16", "2024-12-25", "2024-12-26"
@@ -85,8 +78,8 @@ const SlaDetailsModal = ({ isOpen, onClose, fastest, slowest }: { isOpen: boolea
     );
 };
 
-const RabDashboard = () => {
-  const { rabData, setRabData } = useOutletContext<RabDataContext>();
+const BqDashboard = () => {
+  const { bqData, setBqData } = useOutletContext<BqDataContext>();
   const { theme } = useContext(ThemeContext);
   const navigate = useNavigate();
 
@@ -97,7 +90,7 @@ const RabDashboard = () => {
   const { availableYears, availablePics } = useMemo(() => {
       const years = new Set<string>();
       const pics = new Set<string>();
-      rabData.forEach(doc => {
+      bqData.forEach(doc => {
           years.add(new Date(doc.receivedRejectedDate).getFullYear().toString());
           pics.add(doc.pic);
       });
@@ -105,44 +98,43 @@ const RabDashboard = () => {
           availableYears: ['all', ...Array.from(years).sort((a,b) => Number(b) - Number(a))],
           availablePics: ['all', ...Array.from(pics).sort()],
       };
-  }, [rabData]);
+  }, [bqData]);
 
   const filteredData = useMemo(() => {
-      return rabData.filter(doc => {
+      return bqData.filter(doc => {
           const matchYear = filters.year === 'all' || new Date(doc.receivedRejectedDate).getFullYear().toString() === filters.year;
           const matchPic = filters.pic === 'all' || doc.pic === filters.pic;
           const matchStatus = filters.status === 'all' || doc.status === filters.status;
           return matchYear && matchPic && matchStatus;
       });
-  }, [rabData, filters]);
+  }, [bqData, filters]);
 
   const dashboardStats = useMemo(() => {
-    const totalRabValue = filteredData.reduce((sum, doc) => sum + calculateTotalBudget(doc), 0);
     const statusCounts = filteredData.reduce((acc, doc) => {
         acc[doc.status] = (acc[doc.status] || 0) + 1;
         return acc;
     }, {} as { [key: string]: number });
     
-    const completedRabs = filteredData.filter(r => r.status === 'Completed');
-    const slas = completedRabs.map(r => calculateSla(r.approvedDate, r.finishDate)).filter(s => s !== null) as number[];
+    const completedBqs = filteredData.filter(r => r.status === 'Completed');
+    const slas = completedBqs.map(r => calculateSla(r.approvedDate, r.finishDate)).filter(s => s !== null) as number[];
     const averageSla = slas.length > 0 ? (slas.reduce((a, b) => a + b, 0) / slas.length) : 0;
     
-    const slaSorted = completedRabs.sort((a,b) => (calculateSla(a.approvedDate, a.finishDate) ?? 999) - (calculateSla(b.approvedDate, b.finishDate) ?? 999));
+    const slaSorted = completedBqs.sort((a,b) => (calculateSla(a.approvedDate, a.finishDate) ?? 999) - (calculateSla(b.approvedDate, b.finishDate) ?? 999));
     const fastestSla = slaSorted.slice(0, 5);
     const slowestSla = slaSorted.slice(-5).reverse();
 
-    return { totalRabValue, statusCounts, averageSla, fastestSla, slowestSla };
+    return { statusCounts, averageSla, fastestSla, slowestSla };
   }, [filteredData]);
   
   const handleFilterChange = (type: 'year' | 'pic' | 'status', value: string) => {
     setFilters(prev => ({ ...prev, [type]: value }));
   };
 
-  const handleSaveNewRab = (dataToSave: Omit<RabDocument, 'sla' | 'detailItems' | 'pdfReady'> & { id?: string }) => {
-    const newRab: RabDocument = { ...dataToSave, id: Date.now().toString(), sla: 0, detailItems: [], pdfReady: false, };
-    setRabData(prev => [newRab, ...prev]);
-    toast.success('RAB baru dibuat!');
-    navigate(`/rab/detail/${newRab.id}`);
+  const handleSaveNewBq = (dataToSave: Omit<RabDocument, 'sla' | 'detailItems' | 'pdfReady'> & { id?: string }) => {
+    const newBq: RabDocument = { ...dataToSave, id: Date.now().toString(), sla: 0, detailItems: [], pdfReady: false, };
+    setBqData(prev => [newBq, ...prev]);
+    toast.success('BQ baru dibuat!');
+    navigate(`/bq/detail/${newBq.id}`);
     setCreateModalOpen(false);
   };
   
@@ -163,29 +155,43 @@ const RabDashboard = () => {
   };
 
   const pieChartData = useMemo(() => Object.entries(dashboardStats.statusCounts).map(([name, value]) => ({ name, value })), [dashboardStats.statusCounts]);
+  
   const picData = useMemo(() => {
     const picMap = new Map<string, number>();
     filteredData.forEach(doc => {
-        picMap.set(doc.pic, (picMap.get(doc.pic) || 0) + calculateTotalBudget(doc));
+        picMap.set(doc.pic, (picMap.get(doc.pic) || 0) + 1);
     });
     return Array.from(picMap.entries())
-        .map(([name, value]) => ({ name, 'Total Nilai RAB': value }))
-        .sort((a,b) => b['Total Nilai RAB'] - a['Total Nilai RAB']);
+        .map(([name, value]) => ({ name, 'Jumlah BQ': value }))
+        .sort((a,b) => b['Jumlah BQ'] - a['Jumlah BQ']);
   }, [filteredData]);
-  const comparisonData = useMemo(() => filteredData
-    .filter(doc => calculateTotalBudget(doc) > 0 && (doc.tenderValue || 0) > 0)
-    .map(doc => ({
-        id: doc.id,
-        name: doc.projectName.length > 20 ? doc.projectName.substring(0, 20) + '...' : doc.projectName,
-        'Nilai RAB': calculateTotalBudget(doc),
-        'Nilai Tender': doc.tenderValue || 0,
-    })).slice(0, 10), [filteredData]);
+
+  const monthlyData = useMemo(() => {
+        const monthMap = new Map<string, number>();
+        filteredData.forEach(doc => {
+            const date = new Date(doc.receivedRejectedDate);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // YYYY-MM
+            monthMap.set(monthKey, (monthMap.get(monthKey) || 0) + 1);
+        });
+        
+        return Array.from(monthMap.entries())
+            .map(([key, value]) => {
+                const [year, month] = key.split('-');
+                const date = new Date(parseInt(year), parseInt(month) - 1);
+                return { 
+                    name: date.toLocaleDateString('id-ID', { month: 'short', year: '2-digit' }), 
+                    'Jumlah BQ': value,
+                    sortKey: key 
+                };
+            })
+            .sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+    }, [filteredData]);
 
   const handleExport = () => {
     const doc = new jsPDF();
-    doc.text("Ringkasan Dashboard RAB", 14, 15);
-    autoTable(doc, { startY: 20, head: [['Metrik', 'Nilai']], body: [['Total Proyek (difilter)', filteredData.length], ['Total Nilai RAB', formatCurrency(dashboardStats.totalRabValue)], ['Rata-rata SLA', `${dashboardStats.averageSla.toFixed(1)} hari`], ...Object.entries(dashboardStats.statusCounts).map(([k,v]) => [`Jumlah ${k}`, v])], theme: 'grid' });
-    doc.save('ringkasan-rab.pdf');
+    doc.text("Ringkasan Dashboard BQ", 14, 15);
+    autoTable(doc, { startY: 20, head: [['Metrik', 'Nilai']], body: [['Total BQ (difilter)', filteredData.length], ['Rata-rata SLA', `${dashboardStats.averageSla.toFixed(1)} hari`], ...Object.entries(dashboardStats.statusCounts).map(([k,v]) => [`Jumlah ${k}`, v])], theme: 'grid' });
+    doc.save('ringkasan-bq.pdf');
     toast.success("Ringkasan dashboard diekspor ke PDF!");
   };
 
@@ -193,18 +199,18 @@ const RabDashboard = () => {
 
   return (
     <>
-    <CreateRabModal isOpen={isCreateModalOpen} onClose={() => setCreateModalOpen(false)} onSave={handleSaveNewRab} initialData={null} />
+    <CreateBqModal isOpen={isCreateModalOpen} onClose={() => setCreateModalOpen(false)} onSave={handleSaveNewBq} initialData={null} />
     <SlaDetailsModal isOpen={isSlaModalOpen} onClose={() => setSlaModalOpen(false)} fastest={dashboardStats.fastestSla} slowest={dashboardStats.slowestSla} />
     <div className="space-y-6 animate-fade-in-up">
         <div className="bg-card p-6 rounded-lg border shadow-sm">
             <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                 <div>
-                    <h2 className="text-xl font-bold text-foreground">Ringkasan RAB</h2>
-                    <p className="text-muted-foreground mt-1">Analisis performa RAB berdasarkan filter yang dipilih.</p>
+                    <h2 className="text-xl font-bold text-foreground">Ringkasan BQ</h2>
+                    <p className="text-muted-foreground mt-1">Analisis performa BQ berdasarkan filter yang dipilih.</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <button onClick={handleExport} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground bg-secondary hover:bg-muted rounded-lg transition"><Download size={16} /> Export</button>
-                    <button onClick={() => setCreateModalOpen(true)} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition shadow"><Plus size={16} /> Buat RAB</button>
+                    <button onClick={() => setCreateModalOpen(true)} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-primary-foreground bg-primary hover:bg-primary/90 rounded-lg transition shadow"><Plus size={16} /> Buat BQ</button>
                 </div>
             </div>
             <div className="mt-4 pt-4 border-t border-border flex items-center gap-3 flex-wrap text-muted-foreground">
@@ -223,9 +229,9 @@ const RabDashboard = () => {
         </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard icon={<DollarSign />} title="Total Nilai RAB" value={formatShortCurrency(dashboardStats.totalRabValue)} />
+        <StatCard icon={<FileText />} title="Total BQ (Difilter)" value={filteredData.length.toString()} />
         <StatCard icon={<Clock />} title="Rata-rata SLA" value={`${dashboardStats.averageSla.toFixed(1)} hari`} changeType={dashboardStats.averageSla < 20 ? 'increase' : 'decrease'} change={dashboardStats.averageSla < 20 ? 'Baik' : 'Perlu Perhatian'} />
-        <StatCard icon={<CheckCircle />} title="RAB Selesai" value={(dashboardStats.statusCounts.Completed || 0).toString()} />
+        <StatCard icon={<CheckCircle />} title="BQ Selesai" value={(dashboardStats.statusCounts.Completed || 0).toString()} />
         <StatCard icon={<Target />} title="Menunggu Approval" value={(dashboardStats.statusCounts['Menunggu Approval'] || 0).toString()} />
       </div>
       
@@ -234,7 +240,7 @@ const RabDashboard = () => {
           <h3 className="text-lg font-semibold text-card-foreground mb-4">Distribusi Status</h3>
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
-              <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} fill="#8884d8" dataKey="value" paddingAngle={5} stroke="hsl(var(--card))" onClick={(data) => navigate(`/rab/daftar?status=${data.name}`)} className="cursor-pointer">
+              <Pie data={pieChartData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} fill="#8884d8" dataKey="value" paddingAngle={5} stroke="hsl(var(--card))" onClick={(data) => navigate(`/bq/daftar?status=${data.name}`)} className="cursor-pointer">
                 {pieChartData.map((entry, index) => <Cell key={`cell-${index}`} fill={statusColors[entry.name]} />)}
               </Pie>
               <Tooltip contentStyle={commonChartProps.tooltipContentStyle} cursor={{fill: 'transparent'}}/>
@@ -243,29 +249,28 @@ const RabDashboard = () => {
           </ResponsiveContainer>
         </div>
         <div className="lg:col-span-3 bg-card p-6 rounded-lg border shadow-sm">
-           <h3 className="text-lg font-semibold text-card-foreground mb-4">Nilai RAB per PIC</h3>
+           <h3 className="text-lg font-semibold text-card-foreground mb-4">Jumlah BQ per PIC</h3>
            <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={picData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }} barCategoryGap="20%">
                   <CartesianGrid strokeDasharray="3 3" stroke={themeStyles.gridStrokeColor} horizontal={false} />
-                  <XAxis type="number" tickFormatter={formatShortCurrency} {...commonChartProps.axisTick} />
+                  <XAxis type="number" allowDecimals={false} {...commonChartProps.axisTick} />
                   <YAxis type="category" dataKey="name" tick={{...commonChartProps.axisTick, width: 80}} width={90} />
-                  <Tooltip contentStyle={commonChartProps.tooltipContentStyle} cursor={commonChartProps.tooltipCursor} formatter={(value: number) => formatCurrency(value)} />
-                  <Bar dataKey="Total Nilai RAB" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                  <Tooltip contentStyle={commonChartProps.tooltipContentStyle} cursor={commonChartProps.tooltipCursor} />
+                  <Bar dataKey="Jumlah BQ" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
                 </BarChart>
            </ResponsiveContainer>
         </div>
       </div>
       <div className="bg-card p-6 rounded-lg border shadow-sm">
-           <h3 className="text-lg font-semibold text-card-foreground mb-4">Perbandingan RAB vs Tender</h3>
+           <h3 className="text-lg font-semibold text-card-foreground mb-4">Volume BQ per Bulan</h3>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={comparisonData} margin={{ top: 5, right: 20, left: 0, bottom: 40 }} barGap={8}>
+              <BarChart data={monthlyData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={themeStyles.gridStrokeColor} />
-                <XAxis dataKey="name" angle={-30} textAnchor="end" interval={0} {...commonChartProps.axisTick} />
-                <YAxis tickFormatter={formatShortCurrency} {...commonChartProps.axisTick} />
-                <Tooltip contentStyle={commonChartProps.tooltipContentStyle} cursor={commonChartProps.tooltipCursor} formatter={(value: number) => formatCurrency(value)}/>
+                <XAxis dataKey="name" {...commonChartProps.axisTick} />
+                <YAxis allowDecimals={false} {...commonChartProps.axisTick} />
+                <Tooltip contentStyle={commonChartProps.tooltipContentStyle} cursor={commonChartProps.tooltipCursor}/>
                 <Legend wrapperStyle={commonChartProps.legendWrapperStyle} />
-                <Bar dataKey="Nilai RAB" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} onClick={(data) => navigate(`/rab/detail/${data.id}`)} className="cursor-pointer" />
-                <Bar dataKey="Nilai Tender" fill="hsl(var(--primary) / 0.5)" radius={[4, 4, 0, 0]} onClick={(data) => navigate(`/rab/detail/${data.id}`)} className="cursor-pointer"/>
+                <Bar dataKey="Jumlah BQ" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
         </div>
@@ -274,4 +279,4 @@ const RabDashboard = () => {
   );
 };
 
-export default RabDashboard;
+export default BqDashboard;

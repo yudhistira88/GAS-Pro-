@@ -1,69 +1,95 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
-import { LayoutDashboard, FileText, Briefcase, ChevronDown } from 'lucide-react';
+import { LayoutDashboard, FileText, Briefcase, Shield, X, Building2 } from 'lucide-react';
+import { AuthContext } from '../contexts/AuthContext';
 
-const Sidebar = () => {
-  const navLinkClasses = ({ isActive }: { isActive: boolean }): string =>
-    `flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${
-      isActive
-        ? 'bg-white text-honda-red shadow-inner'
-        : 'text-white hover:bg-red-700'
-    }`;
-
-  const subNavLinkClasses = ({ isActive }: { isActive: boolean }): string =>
-  `flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-200 ${
-    isActive
-      ? 'bg-red-400/50 text-white'
-      : 'text-red-200 hover:bg-red-700'
-  }`;
-
+const NavLink = ({ to, icon, children }: { to: string; icon: React.ReactNode; children: React.ReactNode }) => {
+  const location = ReactRouterDOM.useLocation();
+  const isActive = location.pathname.startsWith(to);
 
   return (
-    <div className="w-64 bg-honda-red text-white flex flex-col p-4 shadow-2xl">
-      <div className="flex items-center justify-center py-4 mb-6">
-         <h1 className="text-2xl font-bold tracking-wider">PROYEK-KU</h1>
-      </div>
-      <nav className="flex-1 flex flex-col space-y-2">
-        <ReactRouterDOM.NavLink to="/dashboard" className={navLinkClasses}>
-          <LayoutDashboard className="mr-3 h-5 w-5" />
-          Dashboard
-        </ReactRouterDOM.NavLink>
-        
-        <div>
-            <ReactRouterDOM.NavLink to="/rab/dashboard" className={navLinkClasses}>
-                <FileText className="mr-3 h-5 w-5" />
-                RAB
-            </ReactRouterDOM.NavLink>
-            <div className="pl-6 mt-1 space-y-1">
-                 <ReactRouterDOM.NavLink to="/rab/dashboard" className={subNavLinkClasses}>
-                    Dashboard
-                </ReactRouterDOM.NavLink>
-                <ReactRouterDOM.NavLink to="/rab/daftar" className={subNavLinkClasses}>
-                    Daftar RAB
-                </ReactRouterDOM.NavLink>
-            </div>
-        </div>
-        
-         <div>
-            <ReactRouterDOM.NavLink to="/project/dashboard" className={navLinkClasses}>
-                <Briefcase className="mr-3 h-5 w-5" />
-                Project
-            </ReactRouterDOM.NavLink>
-            <div className="pl-6 mt-1 space-y-1">
-                 <ReactRouterDOM.NavLink to="/project/dashboard" className={subNavLinkClasses}>
-                    Dashboard
-                </ReactRouterDOM.NavLink>
-                <ReactRouterDOM.NavLink to="/project/daftar" className={subNavLinkClasses}>
-                    Daftar Project
-                </ReactRouterDOM.NavLink>
-            </div>
-        </div>
+    <ReactRouterDOM.NavLink
+      to={to}
+      className={`flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+        isActive
+          ? 'bg-primary/10 text-primary'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+      }`}
+    >
+      {icon}
+      <span className="ml-3">{children}</span>
+    </ReactRouterDOM.NavLink>
+  );
+};
 
-      </nav>
-      <div className="mt-auto text-center text-xs text-red-200">
-        <p>&copy; {new Date().getFullYear()} Proyek-Ku Inc.</p>
+interface SidebarProps {
+    isOpen: boolean;
+    setIsOpen: (isOpen: boolean) => void;
+}
+
+const SidebarContent = () => {
+    const { currentUser } = useContext(AuthContext);
+
+    return (
+        <div className="flex flex-col h-full">
+            <div className="h-16 flex items-center px-6 border-b border-border">
+                <Building2 className="h-6 w-6 text-primary" />
+                <h1 className="ml-3 text-lg font-bold text-foreground">GAS Pro!</h1>
+            </div>
+            <nav className="flex-1 px-4 py-4 space-y-1">
+                <NavLink to="/dashboard" icon={<LayoutDashboard className="h-5 w-5" />}>
+                Dashboard
+                </NavLink>
+                {currentUser && !['OBM', 'Purchasing'].includes(currentUser.role) && (
+                <NavLink to="/bq" icon={<FileText className="h-5 w-5" />}>
+                    BQ
+                </NavLink>
+                )}
+                {currentUser && !['OBM', 'Purchasing'].includes(currentUser.role) && (
+                <NavLink to="/rab" icon={<FileText className="h-5 w-5" />}>
+                    RAB
+                </NavLink>
+                )}
+                <NavLink to="/project" icon={<Briefcase className="h-5 w-5" />}>
+                Project
+                </NavLink>
+            </nav>
+            <div className="mt-auto p-4 border-t border-border text-center text-xs text-muted-foreground">
+                <p>&copy; {new Date().getFullYear()} GAS Pro! Inc.</p>
+            </div>
+        </div>
+    );
+};
+
+const Sidebar = ({ isOpen, setIsOpen }: SidebarProps) => {
+  return (
+    <>
+      {/* Mobile Sidebar */}
+      <div
+        className={`fixed inset-0 bg-black/60 z-40 lg:hidden transition-opacity ${
+          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={() => setIsOpen(false)}
+      ></div>
+      <div
+        className={`fixed top-0 left-0 h-full w-64 bg-card text-card-foreground z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <SidebarContent />
+        <button
+          onClick={() => setIsOpen(false)}
+          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
+        >
+          <X className="h-6 w-6" />
+        </button>
       </div>
-    </div>
+
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:block fixed top-0 left-0 h-full w-64 bg-card text-card-foreground border-r border-border">
+        <SidebarContent />
+      </div>
+    </>
   );
 };
 

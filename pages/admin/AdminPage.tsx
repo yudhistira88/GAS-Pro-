@@ -48,6 +48,7 @@ const AdminPage = () => {
   const { projects, rabData, priceDatabase, workItems, setProjects, setRabData, setPriceDatabase, setWorkItems, initialData } = ReactRouterDOM.useOutletContext<any>();
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isFormatConfirmOpen, setIsFormatConfirmOpen] = useState(false);
+  const [isResetExceptDbConfirmOpen, setIsResetExceptDbConfirmOpen] = useState(false);
   
   const handleExport = (data: any, filename: string, type: 'json' | 'xlsx') => {
     if (type === 'json') {
@@ -97,6 +98,13 @@ const AdminPage = () => {
     setWorkItems(initialData.initialWorkItems);
     setIsResetConfirmOpen(false);
     toast.success('Semua data aplikasi berhasil direset ke pengaturan awal!');
+  };
+
+  const handleResetExceptDb = () => {
+    setProjects(initialData.initialProjects);
+    setRabData(initialData.initialRabData);
+    setIsResetExceptDbConfirmOpen(false);
+    toast.success('Data proyek dan RAB berhasil direset. Database tetap aman!');
   };
 
   const handleFormatData = () => {
@@ -169,6 +177,14 @@ const AdminPage = () => {
         message="PERHATIAN! Tindakan ini akan MENGHAPUS SEMUA data proyek, RAB, dan database secara permanen. Data akan menjadi kosong. Apakah Anda benar-benar yakin?"
       />
 
+      <ConfirmationModal 
+        isOpen={isResetExceptDbConfirmOpen}
+        onClose={() => setIsResetExceptDbConfirmOpen(false)}
+        onConfirm={handleResetExceptDb}
+        title="Reset Data (Kecuali Database)"
+        message="Anda yakin? Semua data Proyek dan RAB akan dikembalikan ke data awal. Data Database Harga dan Pekerjaan TIDAK akan terpengaruh. Tindakan ini tidak dapat dibatalkan."
+      />
+
       <DataManagementCard 
         title="Data Proyek"
         onExportJson={() => handleExport(projects, 'projects_data', 'json')}
@@ -201,6 +217,12 @@ const AdminPage = () => {
                 className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-orange-500 border border-orange-600 rounded-lg hover:bg-orange-600 transition"
                 >
                 <Trash2 size={16} /> Format Data
+            </button>
+            <button
+                onClick={() => setIsResetExceptDbConfirmOpen(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-yellow-500 border border-yellow-600 rounded-lg hover:bg-yellow-600 transition"
+            >
+                <RefreshCw size={16} /> Reset Kecuali Database
             </button>
             <button
             onClick={() => setIsResetConfirmOpen(true)}

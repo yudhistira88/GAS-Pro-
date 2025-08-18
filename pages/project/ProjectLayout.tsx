@@ -9,19 +9,19 @@ interface ProjectLayoutProps {
 
 const ProjectLayout = ({ projects, setProjects }: ProjectLayoutProps) => {
     const tabClasses = ({ isActive }: { isActive: boolean }): string =>
-        `px-4 py-2 font-medium text-sm rounded-t-lg transition-colors duration-200 focus:outline-none ${
+        `px-4 py-2 font-semibold text-sm rounded-md transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         isActive
-            ? 'border-b-2 border-honda-red text-honda-red'
-            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+            ? 'bg-primary text-primary-foreground'
+            : 'text-muted-foreground hover:bg-muted'
         }`;
 
   return (
     <div className="space-y-6">
        <div>
-            <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Monitoring Proyek</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-1">Lacak kemajuan, tenggat waktu, dan status semua proyek Anda.</p>
+            <h1 className="text-3xl font-bold text-foreground">Monitoring Proyek</h1>
+            <p className="text-muted-foreground mt-1">Lacak kemajuan, tenggat waktu, dan status semua proyek Anda.</p>
         </div>
-        <div className="flex border-b border-gray-200 dark:border-gray-700">
+        <div className="flex space-x-2 p-1 bg-muted rounded-lg">
             <ReactRouterDOM.NavLink to="dashboard" className={tabClasses}>Dashboard Proyek</ReactRouterDOM.NavLink>
             <ReactRouterDOM.NavLink to="daftar" className={tabClasses}>Daftar Proyek</ReactRouterDOM.NavLink>
         </div>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useLocation } from 'react-router-dom';
 import { type PriceDatabaseItem, type WorkItem, type WorkItemCategory } from '../../types';
 import { Search, Plus, Upload, Download, Filter, MoreVertical, Pencil, Trash2, X, HardHat, Settings, Check, Edit } from 'lucide-react';
 import PriceItemModal from '../../components/PriceItemModal';
@@ -7,6 +7,7 @@ import WorkItemModal from '../../components/WorkItemModal';
 import ConfirmationModal from '../../components/ConfirmationModal';
 import WorkItemAhsModal from '../../components/WorkItemAhsModal';
 import AddCategoryModal from '../../components/AddCategoryModal';
+import AdminAuthModal from '../../components/AdminAuthModal';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import saveAs from 'file-saver';
@@ -360,6 +361,33 @@ const PriceItemsView = ({ priceDatabase, setPriceDatabase, priceCategories, setP
 
 // --- WORK ITEMS VIEW (Daftar Pekerjaan) ---
 
+const WorkItemsActionMenu = ({ item, onEdit, onDelete, onEditAhs }: { item: WorkItem, onEdit: () => void, onDelete: () => void, onEditAhs: () => void }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) setIsOpen(false);
+        };
+        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isOpen]);
+
+    return (
+        <div className="relative" ref={menuRef}>
+            <button onClick={() => setIsOpen(!isOpen)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"><MoreVertical size={18} /></button>
+            {isOpen && (
+                <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-20 animate-fade-in-up-fast p-1">
+                    <button onClick={() => { onEdit(); setIsOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"><Pencil size={16} /> Edit Detail</button>
+                    <button onClick={() => { onEditAhs(); setIsOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"><HardHat size={16} /> Atur AHS</button>
+                    <div className="my-1 border-t border-gray-100 dark:border-gray-700"></div>
+                    <button onClick={() => { onDelete(); setIsOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"><Trash2 size={16} /> Hapus</button>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const WorkItemsView = ({ workItems, setWorkItems, workCategories, setWorkCategories, priceDatabase, setPriceDatabase }: DatabaseContext) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [categoryFilter, setCategoryFilter] = useState<WorkItemCategory | 'all'>('all');
@@ -370,6 +398,13 @@ const WorkItemsView = ({ workItems, setWorkItems, workCategories, setWorkCategor
     const [isManageCatModalOpen, setIsManageCatModalOpen] = useState(false);
     const [isAhsModalOpen, setIsAhsModalOpen] = useState(false);
     const [editingAhsItem, setEditingAhsItem] = useState<WorkItem | null>(null);
+    const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
+    const [onAdminAuthSuccess, setOnAdminAuthSuccess] = useState<(() => void) | null>(null);
+
+    const requestAdminAuth = (callback: () => void) => {
+        setOnAdminAuthSuccess(() => callback);
+        setIsAdminAuthModalOpen(true);
+    };
 
     const filteredData = useMemo(() => {
         return workItems
@@ -430,26 +465,54 @@ const WorkItemsView = ({ workItems, setWorkItems, workCategories, setWorkCategor
             <WorkItemModal isOpen={isModalOpen} onClose={handleCloseModal} onSave={handleSaveItem} initialData={editingItem} categories={workCategories} setCategories={setWorkCategories} />
             <ManageCategoriesModal isOpen={isManageCatModalOpen} onClose={() => setIsManageCatModalOpen(false)} title="Kelola Kategori Pekerjaan" categories={workCategories} setCategories={setWorkCategories} items={workItems} setItems={setWorkItems} itemCategoryField="category" />
             {editingAhsItem && <WorkItemAhsModal isOpen={isAhsModalOpen} onClose={() => setIsAhsModalOpen(false)} onSave={handleSaveAhs} item={editingAhsItem} priceDatabase={priceDatabase} />}
-
+            <AdminAuthModal
+                isOpen={isAdminAuthModalOpen}
+                onClose={() => {
+                    setIsAdminAuthModalOpen(false);
+                    setOnAdminAuthSuccess(null);
+                }}
+                onSuccess={() => {
+                    if (onAdminAuthSuccess) {
+                        onAdminAuthSuccess();
+                    }
+                    setIsAdminAuthModalOpen(false);
+                    setOnAdminAuthSuccess(null);
+                }}
+            />
             <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
                 <div className="flex w-full md:w-auto items-center gap-2 flex-wrap">
                     <div className="relative w-full sm:w-auto flex-grow sm:flex-grow-0"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} /><input type="search" placeholder="Cari Nama Pekerjaan..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-honda-red focus:border-transparent transition bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200" /></div>
                     <div className="relative"><select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as any)} className="appearance-none w-full sm:w-auto text-sm p-2 pl-4 pr-8 border-gray-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-honda-red focus:border-transparent transition bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"><option value="all">Semua Kategori</option>{workCategories.map(c => <option key={c} value={c}>{c}</option>)}</select><Filter className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" size={16} /></div>
                      <button onClick={() => setIsManageCatModalOpen(true)} className="text-sm text-gray-600 dark:text-gray-300 hover:text-honda-red dark:hover:text-honda-red flex items-center gap-1"><Settings size={14} /> Kelola Kategori</button>
                 </div>
-                <div className="flex items-center gap-2 w-full md:w-auto"><button onClick={handleOpenCreateModal} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-honda-red rounded-lg hover:bg-red-700 transition shadow"><Plus size={16} /> Tambah Pekerjaan</button></div>
+                <div className="flex items-center gap-2 w-full md:w-auto"><button onClick={() => requestAdminAuth(handleOpenCreateModal)} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-honda-red rounded-lg hover:bg-red-700 transition shadow"><Plus size={16} /> Tambah Pekerjaan</button></div>
             </div>
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                     <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50">
                         <tr>
-                            <th scope="col" className="px-6 py-3">Nama Pekerjaan</th><th scope="col" className="px-6 py-3">Kategori</th><th scope="col" className="px-6 py-3 text-right">Harga Default</th><th scope="col" className="px-6 py-3 text-center">Aksi AHS</th><th scope="col" className="px-6 py-3">Sumber</th><th scope="col" className="px-6 py-3">Update Terakhir</th><th scope="col" className="px-6 py-3 text-center">Aksi</th>
+                            <th scope="col" className="px-6 py-3">Nama Pekerjaan</th>
+                            <th scope="col" className="px-6 py-3">Kategori</th>
+                            <th scope="col" className="px-6 py-3">Sumber</th>
+                            <th scope="col" className="px-6 py-3">Update Terakhir</th>
+                            <th scope="col" className="px-6 py-3 text-center">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filteredData.map((item) => (
                             <tr key={item.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                                <th scope="row" className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">{item.name}</th><td className="px-6 py-4">{item.category}</td><td className="px-6 py-4 text-right font-semibold text-gray-800 dark:text-gray-100">{formatCurrency(item.defaultPrice)}</td><td className="px-6 py-4 text-center"> <button onClick={() => handleOpenAhsModal(item)} className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-md hover:bg-indigo-200 dark:bg-indigo-900/50 dark:text-indigo-300 dark:hover:bg-indigo-900 transition"><HardHat size={14} /> Atur AHS</button></td><td className="px-6 py-4">{item.source}</td><td className="px-6 py-4 text-gray-600 dark:text-gray-400">{formatDate(item.lastUpdated)}</td><td className="px-6 py-4 text-center"><PriceItemsActionMenu item={item as any} onEdit={() => handleOpenEditModal(item)} onDelete={() => handleDeleteRequest(item.id)} /></td>
+                                <th scope="row" className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">{item.name}</th>
+                                <td className="px-6 py-4">{item.category}</td>
+                                <td className="px-6 py-4">{item.source}</td>
+                                <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{formatDate(item.lastUpdated)}</td>
+                                <td className="px-6 py-4 text-center">
+                                    <WorkItemsActionMenu 
+                                        item={item} 
+                                        onEdit={() => requestAdminAuth(() => handleOpenEditModal(item))} 
+                                        onDelete={() => requestAdminAuth(() => handleDeleteRequest(item.id))}
+                                        onEditAhs={() => requestAdminAuth(() => handleOpenAhsModal(item))}
+                                    />
+                                </td>
                             </tr>
                         ))}
                     </tbody>
@@ -464,7 +527,10 @@ const WorkItemsView = ({ workItems, setWorkItems, workCategories, setWorkCategor
 
 const PriceDatabase = () => {
     const context = useOutletContext<DatabaseContext>();
-    const [activeTab, setActiveTab] = useState<'items' | 'works'>('items');
+    const location = useLocation();
+    const isBqModule = location.pathname.startsWith('/bq');
+    
+    const [activeTab, setActiveTab] = useState<'items' | 'works'>(isBqModule ? 'works' : 'items');
 
     const tabClasses = (isActive: boolean) =>
       `px-6 py-3 text-sm font-semibold border-b-2 transition-colors duration-300 ${
@@ -472,6 +538,14 @@ const PriceDatabase = () => {
           ? 'border-honda-red text-honda-red'
           : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white'
       }`;
+      
+    if (isBqModule) {
+        return (
+            <div className="space-y-6 animate-fade-in-up">
+                <WorkItemsView {...context} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 animate-fade-in-up">
