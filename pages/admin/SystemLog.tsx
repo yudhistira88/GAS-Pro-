@@ -1,22 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useContext } from 'react';
 import { Filter } from 'lucide-react';
-
-interface LogEntry {
-  id: string;
-  timestamp: string;
-  level: 'INFO' | 'WARNING' | 'ERROR';
-  user: string;
-  action: string;
-  details: string;
-}
-
-const initialLogs: LogEntry[] = [
-  { id: 'log-1', timestamp: '2024-07-20T10:05:00Z', level: 'INFO', user: 'Admin Utama', action: 'LOGIN_SUCCESS', details: 'User logged in successfully from IP 192.168.1.1' },
-  { id: 'log-2', timestamp: '2024-07-20T10:02:00Z', level: 'INFO', user: 'Andi', action: 'UPDATE_RAB', details: 'Updated RAB "RAB005"' },
-  { id: 'log-3', timestamp: '2024-07-20T09:55:00Z', level: 'WARNING', user: 'System', action: 'API_TIMEOUT', details: 'Gemini API call timed out for AHS generation.' },
-  { id: 'log-4', timestamp: '2024-07-20T09:40:00Z', level: 'ERROR', user: 'Citra', action: 'DELETE_PROJECT_FAILED', details: 'Permission denied for deleting project "PROJ001"' },
-  { id: 'log-5', timestamp: '2024-07-19T15:00:00Z', level: 'INFO', user: 'Budi', action: 'CREATE_PROJECT', details: 'Created new project "Project X"' },
-];
+import { type LogEntry } from '../../types';
+import { LogContext } from '../../contexts/LogContext';
 
 const LogLevelBadge = ({ level }: { level: LogEntry['level'] }) => {
     const levelClasses: Record<LogEntry['level'], string> = {
@@ -28,7 +13,7 @@ const LogLevelBadge = ({ level }: { level: LogEntry['level'] }) => {
 }
 
 const SystemLog = () => {
-  const [logs, setLogs] = useState<LogEntry[]>(initialLogs);
+  const { logs } = useContext(LogContext);
   const [filters, setFilters] = useState({ level: 'all', dateFrom: '', dateTo: '' });
 
   const filteredLogs = useMemo(() => {

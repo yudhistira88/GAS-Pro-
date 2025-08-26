@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { type Project, type ProjectPhase } from '../types';
-import { X } from 'lucide-react';
+import { X, Briefcase, Layers, Users, Calendar, Save, FileText } from 'lucide-react';
 
 type FormData = Omit<Project, 'id' | 'phases'> & { planStartDate: string };
 
@@ -11,6 +12,7 @@ const emptyFormState: FormData = {
     dueDate: '', // Will be used as planEndDate
     progress: 0,
     group: '',
+    description: '',
     planStartDate: '',
 };
 
@@ -41,6 +43,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSave, initialData }: {
                     status: initialData.status,
                     progress: initialData.progress,
                     group: initialData.group || '',
+                    description: initialData.description || '',
                     planStartDate: planStartDate ? new Date(planStartDate).toISOString().split('T')[0] : '',
                     dueDate: planEndDate ? new Date(planEndDate).toISOString().split('T')[0] : '',
                 });
@@ -55,8 +58,10 @@ const CreateProjectModal = ({ isOpen, onClose, onSave, initialData }: {
         }
     }, [isOpen, initialData]);
 
-    const inputClasses = "w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-honda-red focus:border-transparent transition bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200";
-    const labelClasses = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
+    const inputWrapperClasses = "relative w-full";
+    const inputIconClasses = "absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none";
+    const inputFieldClasses = "w-full pl-10 pr-4 py-2 bg-background border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring transition-colors";
+    const labelClasses = "block text-sm font-medium text-foreground mb-1.5";
     
     const handleProgressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const progress = parseInt(e.target.value, 10);
@@ -82,7 +87,7 @@ const CreateProjectModal = ({ isOpen, onClose, onSave, initialData }: {
         setFormData(prev => ({...prev, status: newStatus, progress: newProgress}));
     }
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
@@ -163,67 +168,122 @@ const CreateProjectModal = ({ isOpen, onClose, onSave, initialData }: {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8 w-full max-w-2xl relative animate-fade-in-up" onClick={e => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white transition rounded-full p-1 hover:bg-gray-100 dark:hover:bg-gray-700">
-                    <X size={24} />
-                </button>
-                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6">
-                    {isEditMode ? 'Edit Proyek' : 'Buat Proyek Baru'}
-                </h2>
-
-                {error && <div className="bg-red-100 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4 text-sm" role="alert">{error}</div>}
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label htmlFor="name" className={labelClasses}>Nama Proyek</label>
-                        <input type="text" name="name" id="name" value={formData.name} onChange={handleChange} className={inputClasses} required />
-                    </div>
-                    <div>
-                        <label htmlFor="group" className={labelClasses}>Kelompok Proyek</label>
-                        <input type="text" name="group" id="group" value={formData.group || ''} onChange={handleChange} className={inputClasses} />
-                    </div>
-                    <div>
-                        <label htmlFor="teamInput" className={labelClasses}>Anggota Tim (pisahkan dengan koma)</label>
-                        <input type="text" id="teamInput" value={teamInput} onChange={(e) => setTeamInput(e.target.value)} className={inputClasses} required />
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="planStartDate" className={labelClasses}>Tanggal Mulai Rencana</label>
-                            <input type="date" name="planStartDate" id="planStartDate" value={formData.planStartDate} onChange={handleChange} className={inputClasses} required />
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
+            <div className="bg-card text-card-foreground rounded-xl shadow-2xl w-full max-w-2xl transform transition-all animate-fade-in-up" onClick={e => e.stopPropagation()}>
+                {/* Header */}
+                <div className="flex items-start justify-between p-6 border-b border-border rounded-t-xl">
+                    <div className="flex items-center gap-4">
+                        <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <Briefcase size={28}/>
                         </div>
                         <div>
-                            <label htmlFor="dueDate" className={labelClasses}>Tanggal Selesai Rencana</label>
-                            <input type="date" name="dueDate" id="dueDate" value={formData.dueDate} onChange={handleChange} className={inputClasses} required />
+                            <h2 className="text-xl font-bold text-foreground">
+                                {isEditMode ? 'Edit Proyek' : 'Buat Proyek Baru'}
+                            </h2>
+                            <p className="text-sm text-muted-foreground">Isi detail proyek di bawah ini.</p>
                         </div>
                     </div>
-                    
-                    <div>
-                        <label htmlFor="phasesInput" className={labelClasses}>Fase Proyek (satu per baris)</label>
-                        <textarea name="phasesInput" id="phasesInput" value={phasesInput} onChange={(e) => setPhasesInput(e.target.value)} rows={4} className={inputClasses}></textarea>
+                    <button onClick={onClose} className="p-2 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit}>
+                    <div className="p-6 max-h-[70vh] overflow-y-auto space-y-6">
+                        {error && <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-md text-sm" role="alert">{error}</div>}
+
+                        <section className="space-y-4">
+                             <h3 className="text-md font-semibold text-foreground border-b border-border pb-2">Detail Proyek</h3>
+                             <div>
+                                <label htmlFor="name" className={labelClasses}>Nama Proyek</label>
+                                <div className={inputWrapperClasses}>
+                                    <Briefcase size={18} className={inputIconClasses} />
+                                    <input type="text" name="name" id="name" value={formData.name} onChange={handleChange} className={inputFieldClasses} required />
+                                </div>
+                            </div>
+                            <div>
+                                <label htmlFor="group" className={labelClasses}>Kelompok Proyek</label>
+                                <div className={inputWrapperClasses}>
+                                    <Layers size={18} className={inputIconClasses} />
+                                    <input type="text" name="group" id="group" value={formData.group || ''} onChange={handleChange} className={inputFieldClasses} />
+                                </div>
+                            </div>
+                             <div>
+                                <label htmlFor="description" className={labelClasses}>Deskripsi Proyek</label>
+                                <div className={inputWrapperClasses}>
+                                    <FileText size={18} className="absolute left-3 top-3 text-muted-foreground pointer-events-none" />
+                                    <textarea
+                                        name="description"
+                                        id="description"
+                                        rows={3}
+                                        value={formData.description || ''}
+                                        onChange={handleChange}
+                                        className={`${inputFieldClasses} pl-10 h-24`}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label htmlFor="teamInput" className={labelClasses}>Anggota Tim (pisahkan dengan koma)</label>
+                                <div className={inputWrapperClasses}>
+                                    <Users size={18} className={inputIconClasses} />
+                                    <input type="text" id="teamInput" value={teamInput} onChange={(e) => setTeamInput(e.target.value)} className={inputFieldClasses} required />
+                                </div>
+                            </div>
+                        </section>
+                        
+                        <section className="space-y-4 border-t border-border pt-6">
+                            <h3 className="text-md font-semibold text-foreground border-b border-border pb-2">Timeline & Fase</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label htmlFor="planStartDate" className={labelClasses}>Tanggal Mulai Rencana</label>
+                                    <div className={inputWrapperClasses}>
+                                        <Calendar size={18} className={inputIconClasses} />
+                                        <input type="date" name="planStartDate" id="planStartDate" value={formData.planStartDate} onChange={handleChange} className={inputFieldClasses} required />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label htmlFor="dueDate" className={labelClasses}>Tanggal Selesai Rencana</label>
+                                    <div className={inputWrapperClasses}>
+                                        <Calendar size={18} className={inputIconClasses} />
+                                        <input type="date" name="dueDate" id="dueDate" value={formData.dueDate} onChange={handleChange} className={inputFieldClasses} required />
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label htmlFor="phasesInput" className={labelClasses}>Fase Proyek (satu per baris)</label>
+                                <textarea name="phasesInput" id="phasesInput" value={phasesInput} onChange={(e) => setPhasesInput(e.target.value)} rows={4} className={`${inputFieldClasses} pl-4 h-32`}></textarea>
+                            </div>
+                        </section>
+
+                        <section className="space-y-4 border-t border-border pt-6">
+                            <h3 className="text-md font-semibold text-foreground border-b border-border pb-2">Status & Progres</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label htmlFor="status" className={labelClasses}>Status</label>
+                                    <select name="status" id="status" value={formData.status} onChange={handleStatusChange} className={`${inputFieldClasses} pl-4`}>
+                                        <option value="Not Started">Not Started</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Completed">Completed</option>
+                                    </select>
+                                </div>
+                                <div>
+                                     <label htmlFor="progress" className={labelClasses}>Progress ({formData.progress}%)</label>
+                                     <input type="range" min="0" max="100" value={formData.progress} onChange={handleProgressChange} className="w-full h-2 bg-muted rounded-lg appearance-none cursor-pointer accent-primary" />
+                                </div>
+                            </div>
+                        </section>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="status" className={labelClasses}>Status</label>
-                            <select name="status" id="status" value={formData.status} onChange={handleStatusChange} className={inputClasses}>
-                                <option value="Not Started">Not Started</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Completed">Completed</option>
-                            </select>
+                    {/* Footer */}
+                    <div className="flex items-center justify-end p-6 border-t border-border rounded-b-xl bg-muted/50">
+                        <div className="flex gap-4">
+                            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-lg hover:bg-muted transition-colors">Batal</button>
+                            <button type="submit" className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition-colors shadow">
+                                <Save size={16} />
+                                {isEditMode ? 'Simpan Perubahan' : 'Buat Proyek'}
+                            </button>
                         </div>
-                        <div>
-                             <label htmlFor="progress" className={labelClasses}>Progress ({formData.progress}%)</label>
-                             <input type="range" min="0" max="100" value={formData.progress} onChange={handleProgressChange} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-honda-red" />
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-4 pt-4">
-                        <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600 transition">Batal</button>
-                        <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-honda-red rounded-lg hover:bg-red-700 transition shadow">
-                            {isEditMode ? 'Simpan Perubahan' : 'Buat Proyek'}
-                        </button>
                     </div>
                 </form>
             </div>

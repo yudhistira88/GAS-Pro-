@@ -1,14 +1,16 @@
 import React, { createContext, useState, useEffect, useMemo } from 'react';
 
-type Theme = 'light' | 'dark';
+type Theme = 'light' | 'dark' | 'system';
 
 interface ThemeContextType {
   theme: Theme;
+  setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
 }
 
 export const ThemeContext = createContext<ThemeContextType>({
-  theme: 'light',
+  theme: 'system',
+  setTheme: () => {},
   toggleTheme: () => {},
 });
 
@@ -20,30 +22,43 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
         const savedTheme = localStorage.getItem('theme') as Theme;
-        if (savedTheme) {
-            return savedTheme;
-        }
-        // Check system preference
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        return savedTheme || 'system';
     }
-    return 'light'; // Default for SSR or non-browser env
+    return 'system';
   });
 
   useEffect(() => {
     const root = window.document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
+
+    const applyTheme = () => {
+        const isDark =
+          theme === 'dark' ||
+          (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        root.classList.toggle('dark', isDark);
     }
+    
+    applyTheme();
     localStorage.setItem('theme', theme);
+    
+    if (theme === 'system') {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = () => applyTheme();
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+    }
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
+    setTheme((prevTheme) => {
+      if (prevTheme === 'system') {
+        const isSystemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        return isSystemDark ? 'light' : 'dark';
+      }
+      return prevTheme === 'light' ? 'dark' : 'light';
+    });
   };
 
-  const value = useMemo(() => ({ theme, toggleTheme }), [theme]);
+  const value = useMemo(() => ({ theme, setTheme, toggleTheme }), [theme]);
 
   return (
     <ThemeContext.Provider value={value}>

@@ -14,14 +14,17 @@ interface StatusBadgeProps {
 
 const StatusBadge = ({ status }: StatusBadgeProps) => {
   const baseClasses = "px-2.5 py-1 text-xs font-semibold rounded-full inline-block tracking-wide";
-  const statusClasses = {
-    Completed: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
-    Approved: "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300",
-    'Menunggu Approval': "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
-    Pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
-    Rejected: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
-    Terkunci: "bg-slate-100 text-slate-800 dark:bg-slate-900/50 dark:text-slate-300",
+  
+  const statusClasses: Record<RabDocument['status'], string> = {
+    Selesai: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+    Approval: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
+    Survey: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+    Diterima: "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300",
+    Ditolak: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+    'Pending': 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300',
+    'Menunggu Approval': 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
   };
+  
   return <span className={`${baseClasses} ${statusClasses[status]}`}>{status}</span>;
 };
 
@@ -80,10 +83,10 @@ const holidays = [
   "2024-09-16", "2024-12-25", "2024-12-26"
 ].map(d => new Date(d).toISOString().split('T')[0]);
 
-const calculateSla = (approvedDateStr: string | null, finishDateStr: string | null): number | string => {
-    if (!approvedDateStr || !finishDateStr) return '-';
+const calculateSla = (receivedDateStr: string | null, finishDateStr: string | null): number | string => {
+    if (!receivedDateStr || !finishDateStr) return '-';
 
-    const startDate = new Date(approvedDateStr);
+    const startDate = new Date(receivedDateStr);
     const endDate = new Date(finishDateStr);
 
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate < startDate) {
@@ -121,7 +124,7 @@ interface BqDataContext {
   setBqData: React.Dispatch<React.SetStateAction<RabDocument[]>>;
 }
 
-const allStatuses: RabDocument['status'][] = ['Pending', 'Menunggu Approval', 'Terkunci', 'Approved', 'Rejected', 'Completed'];
+const allStatuses: RabDocument['status'][] = ['Survey', 'Approval', 'Diterima', 'Ditolak', 'Selesai', 'Pending', 'Menunggu Approval'];
 
 type SortKey = keyof RabDocument | 'sla' | 'no';
 type SortOrder = 'asc' | 'desc';
@@ -152,16 +155,16 @@ const BqRow = React.memo(({ bq, index, onEdit, onDelete, onMove, totalRows } : {
             <td className="px-4 py-2 text-center text-xs">{bq.pic}</td>
             <td className="px-4 py-2">
                 <div className="grid grid-cols-[auto_1fr] gap-x-2 text-xs">
-                    <strong className="font-semibold text-gray-600 dark:text-gray-400 text-right">Diterima:</strong>
-                    <span className="text-left">{formatDateForRow(bq.receivedRejectedDate)}</span>
-                    <strong className="font-semibold text-gray-600 dark:text-gray-400 text-right">Disetujui:</strong>
-                    <span className="text-left">{formatDateForRow(bq.approvedDate)}</span>
-                    <strong className="font-semibold text-gray-600 dark:text-gray-400 text-right">Selesai:</strong>
+                    <strong className="font-semibold text-gray-600 dark:text-gray-400 text-right">Tgl. Survey:</strong>
+                    <span className="text-left">{formatDateForRow(bq.surveyDate)}</span>
+                    <strong className="font-semibold text-gray-600 dark:text-gray-400 text-right">Tgl. Diterima:</strong>
+                    <span className="text-left">{formatDateForRow(bq.receivedDate)}</span>
+                    <strong className="font-semibold text-gray-600 dark:text-gray-400 text-right">Tgl. Selesai:</strong>
                     <span className="text-left">{formatDateForRow(bq.finishDate)}</span>
                 </div>
             </td>
             <td className="px-4 py-2 text-center"><StatusBadge status={bq.status} /></td>
-            <td className="px-4 py-2 text-center font-medium text-xs">{calculateSla(bq.approvedDate, bq.finishDate)}</td>
+            <td className="px-4 py-2 text-center font-medium text-xs">{calculateSla(bq.receivedDate, bq.finishDate)}</td>
             <td className="px-4 py-2 text-xs">{bq.keterangan || '-'}</td>
             <td className="px-4 py-2 text-center">
                 <ActionMenu bq={bq} onDelete={onDelete} onEdit={onEdit} />
@@ -177,7 +180,7 @@ const BqList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBq, setEditingBq] = useState<RabDocument | null>(null);
   const [statusFilters, setStatusFilters] = useState<RabDocument['status'][]>([]);
-  const [dateFilters, setDateFilters] = useState({ received: { from: '', to: '' }, approved: { from: '', to: '' }, finish: { from: '', to: '' } });
+  const [dateFilters, setDateFilters] = useState({ survey: { from: '', to: '' }, received: { from: '', to: '' }, finish: { from: '', to: '' } });
   const [slaFilter, setSlaFilter] = useState({ min: '', max: '' });
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
@@ -200,8 +203,8 @@ const BqList = () => {
 
   const activeFilterCount = useMemo(() => {
     let count = statusFilters.length;
-    if (dateFilters.received.from) count++; if (dateFilters.received.to) count++; if (dateFilters.approved.from) count++;
-    if (dateFilters.approved.to) count++; if (dateFilters.finish.from) count++; if (dateFilters.finish.to) count++;
+    if (dateFilters.survey.from) count++; if (dateFilters.survey.to) count++; if (dateFilters.received.from) count++;
+    if (dateFilters.received.to) count++; if (dateFilters.finish.from) count++; if (dateFilters.finish.to) count++;
     if (slaFilter.min) count++; if (slaFilter.max) count++;
     return count;
   }, [statusFilters, dateFilters, slaFilter]);
@@ -220,9 +223,9 @@ const BqList = () => {
             if (range.to) { const toDate = new Date(range.to); toDate.setHours(0, 0, 0, 0); if (itemDate > toDate) return false; }
             return true;
         };
-        const matchesDates = checkDateRange(bq.receivedRejectedDate, dateFilters.received) && checkDateRange(bq.approvedDate, dateFilters.approved) && checkDateRange(bq.finishDate, dateFilters.finish);
+        const matchesDates = checkDateRange(bq.surveyDate, dateFilters.survey) && checkDateRange(bq.receivedDate, dateFilters.received) && checkDateRange(bq.finishDate, dateFilters.finish);
 
-        const slaValue = calculateSla(bq.approvedDate, bq.finishDate);
+        const slaValue = calculateSla(bq.receivedDate, bq.finishDate);
         const matchesSla = (() => {
             if (slaFilter.min === '' && slaFilter.max === '') return true;
             if (typeof slaValue !== 'number') return false; // Don't match if SLA is '-'
@@ -238,7 +241,7 @@ const BqList = () => {
     if (sortConfig) {
       data.sort((a, b) => {
         let aValue: any, bValue: any;
-        if (sortConfig.key === 'sla') { aValue = calculateSla(a.approvedDate, a.finishDate); bValue = calculateSla(b.approvedDate, b.finishDate); if (aValue === '-') aValue = -1; if (bValue === '-') bValue = -1; } 
+        if (sortConfig.key === 'sla') { aValue = calculateSla(a.receivedDate, a.finishDate); bValue = calculateSla(b.receivedDate, b.finishDate); if (aValue === '-') aValue = -1; if (bValue === '-') bValue = -1; } 
         else { aValue = a[sortConfig.key as keyof RabDocument]; bValue = b[sortConfig.key as keyof RabDocument]; }
         if (aValue === null || aValue === undefined) return 1; if (bValue === null || bValue === undefined) return -1;
         if (aValue < bValue) return sortConfig.order === 'asc' ? -1 : 1; if (aValue > bValue) return sortConfig.order === 'asc' ? 1 : -1;
@@ -266,14 +269,14 @@ const BqList = () => {
   const handleOpenCreateModal = () => { setEditingBq(null); setIsModalOpen(true); };
   const handleOpenEditModal = useCallback((bq: RabDocument) => { setEditingBq(bq); setIsModalOpen(true); }, []);
   const handleStatusFilterChange = (status: RabDocument['status']) => { setStatusFilters(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]); };
-  const handleDateFilterChange = (type: 'received' | 'approved' | 'finish', field: 'from' | 'to', value: string) => { setDateFilters(prev => ({ ...prev, [type]: { ...prev[type], [field]: value, }, })); };
+  const handleDateFilterChange = (type: 'survey' | 'received' | 'finish', field: 'from' | 'to', value: string) => { setDateFilters(prev => ({ ...prev, [type]: { ...prev[type], [field]: value, }, })); };
   
   const handleDeleteRequest = useCallback((id: string) => { setItemToDelete(id); setIsConfirmOpen(true); }, []);
   const confirmDelete = () => { if (itemToDelete) { const newData = bqData.filter(bq => bq.id !== itemToDelete); setBqData(newData); toast.success('BQ berhasil dihapus.'); } setIsConfirmOpen(false); setItemToDelete(null); };
 
   const resetFilters = () => {
     setStatusFilters([]);
-    setDateFilters({ received: { from: '', to: '' }, approved: { from: '', to: '' }, finish: { from: '', to: '' } });
+    setDateFilters({ survey: { from: '', to: '' }, received: { from: '', to: '' }, finish: { from: '', to: '' } });
     setSlaFilter({ min: '', max: '' });
     setIsFilterOpen(false);
   };
@@ -343,21 +346,20 @@ const BqList = () => {
     const formatDate = (dateString: string | null) => dateString ? new Date(dateString).toLocaleDateString('id-ID') : '-';
 
     // Set Header
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
     doc.text("Monitoring BQ", 14, 15);
-    doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
     doc.text("Rekapitulasi Bill of Quantity Proyek", 14, 22);
 
     const statusColors: { [key in RabDocument['status']]: { bg: number[], text: number[] } } = {
-        Completed: { bg: [220, 252, 231], text: [22, 101, 52] }, // green
-        Approved:  { bg: [224, 242, 254], text: [7, 89, 133] },   // sky
-        'Menunggu Approval': { bg: [238, 242, 255], text: [67, 56, 202] }, // indigo
-        Pending:   { bg: [254, 249, 195], text: [133, 77, 14] },  // yellow
-        Rejected:  { bg: [254, 226, 226], text: [153, 27, 27] }, // red
-        Terkunci: { bg: [241, 245, 249], text: [51, 65, 85] }, // slate
+        Selesai: { bg: [220, 252, 231], text: [22, 101, 52] },
+        Diterima: { bg: [224, 242, 254], text: [7, 89, 133] },
+        Ditolak: { bg: [254, 226, 226], text: [153, 27, 27] },
+        Approval: { bg: [238, 242, 255], text: [67, 56, 202] },
+        Survey:   { bg: [254, 249, 195], text: [133, 77, 14] },
+        'Pending': { bg: [255, 247, 237], text: [154, 52, 18] },
+        'Menunggu Approval': { bg: [245, 243, 255], text: [91, 33, 182] },
     };
+
 
     const head = [['NO', 'EMPR', 'URAIAN PROJECT', 'PIC', 'TIMELINE', 'STATUS', 'SLA (HARI KERJA)', 'KETERANGAN']];
     const body = sortedAndFilteredData.map((bq, index) => {
@@ -366,9 +368,9 @@ const BqList = () => {
             bq.eMPR,
             bq.projectName,
             bq.pic,
-            `Diterima: ${formatDate(bq.receivedRejectedDate)}\nDisetujui: ${formatDate(bq.approvedDate)}\nSelesai: ${formatDate(bq.finishDate)}`,
+            `Survey: ${formatDate(bq.surveyDate)}\nDiterima: ${formatDate(bq.receivedDate)}\nSelesai: ${formatDate(bq.finishDate)}`,
             bq.status,
-            calculateSla(bq.approvedDate, bq.finishDate),
+            calculateSla(bq.receivedDate, bq.finishDate),
             bq.keterangan || '-'
         ];
     });
@@ -392,14 +394,7 @@ const BqList = () => {
             valign: 'middle'
         },
         columnStyles: {
-            0: { cellWidth: 10, halign: 'center' },
-            1: { cellWidth: 25, halign: 'center' },
-            2: { cellWidth: 70, halign: 'left' },
-            3: { cellWidth: 20, halign: 'center' },
-            4: { cellWidth: 35, halign: 'left' },
-            5: { cellWidth: 25, halign: 'center' },
-            6: { cellWidth: 20, halign: 'center' },
-            7: { cellWidth: 'auto', halign: 'left' }
+            0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 25, halign: 'center' }, 2: { cellWidth: 70, halign: 'left' }, 3: { cellWidth: 20, halign: 'center' }, 4: { cellWidth: 35, halign: 'left' }, 5: { cellWidth: 25, halign: 'center' }, 6: { cellWidth: 20, halign: 'center' }, 7: { cellWidth: 'auto', halign: 'left' }
         },
         willDrawCell: (data) => {
             if (data.section === 'head') {
@@ -409,26 +404,24 @@ const BqList = () => {
         didDrawCell: (data) => {
             if (data.section === 'body' && data.column.index === 5) {
                 const status = data.cell.raw as RabDocument['status'];
-                if (statusColors[status]) {
-                    const { bg, text } = statusColors[status];
+                const finalColors = statusColors[status];
+                const text = status;
+
+                if (finalColors) {
+                    const { bg, text: textColor } = finalColors;
                     const { x, y, width, height } = data.cell;
                     
-                    const textWidth = doc.getStringUnitWidth(status) * (data.cell.styles.fontSize || 7) / doc.internal.scaleFactor;
+                    const textWidth = doc.getStringUnitWidth(text) * (data.cell.styles.fontSize || 7) / doc.internal.scaleFactor;
                     const badgeWidth = textWidth + 4;
                     const badgeHeight = 5;
                     const badgeX = x + (width - badgeWidth) / 2;
                     const badgeY = y + (height - badgeHeight) / 2;
-
                     doc.setFillColor(bg[0], bg[1], bg[2]);
                     doc.roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 1.5, 1.5, 'F');
-                    
                     doc.setFontSize(7);
                     doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(text[0], text[1], text[2]);
-                    doc.text(status, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2, {
-                        align: 'center',
-                        baseline: 'middle'
-                    });
+                    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+                    doc.text(text, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2, { align: 'center', baseline: 'middle' });
                 }
             }
         }
@@ -469,17 +462,17 @@ const BqList = () => {
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-3">
                         <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Timeline</h4>
                         <div>
-                           <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Tgl. Diterima</label>
+                           <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Tgl. Survey</label>
                            <div className="grid grid-cols-2 gap-2 mt-1">
-                               <input type="date" value={dateFilters.received.from} onChange={e => handleDateFilterChange('received', 'from', e.target.value)} className={dateInputClasses} placeholder="From"/>
-                               <input type="date" value={dateFilters.received.to} onChange={e => handleDateFilterChange('received', 'to', e.target.value)} className={dateInputClasses} placeholder="To"/>
+                               <input type="date" value={dateFilters.survey.from} onChange={e => handleDateFilterChange('survey', 'from', e.target.value)} className={dateInputClasses} placeholder="From"/>
+                               <input type="date" value={dateFilters.survey.to} onChange={e => handleDateFilterChange('survey', 'to', e.target.value)} className={dateInputClasses} placeholder="To"/>
                            </div>
                         </div>
                         <div>
-                           <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Tgl. Disetujui</label>
+                           <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Tgl. Diterima</label>
                            <div className="grid grid-cols-2 gap-2 mt-1">
-                               <input type="date" value={dateFilters.approved.from} onChange={e => handleDateFilterChange('approved', 'from', e.target.value)} className={dateInputClasses} />
-                               <input type="date" value={dateFilters.approved.to} onChange={e => handleDateFilterChange('approved', 'to', e.target.value)} className={dateInputClasses} />
+                               <input type="date" value={dateFilters.received.from} onChange={e => handleDateFilterChange('received', 'from', e.target.value)} className={dateInputClasses} />
+                               <input type="date" value={dateFilters.received.to} onChange={e => handleDateFilterChange('received', 'to', e.target.value)} className={dateInputClasses} />
                            </div>
                         </div>
                          <div>
@@ -528,7 +521,7 @@ const BqList = () => {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 border-collapse">
-            <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50 sticky top-0 z-10">
+            <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50">
               <tr>
                 <th scope="col" className="px-4 py-3 uppercase w-20 text-center">No</th>
                 <th scope="col" className={`${headerButtonClass} w-40`} onClick={() => handleHeaderSort('eMPR')}>eMPR {getSortIndicator('eMPR')}</th>

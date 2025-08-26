@@ -209,7 +209,7 @@ const PriceItemsView = ({ priceDatabase, setPriceDatabase, priceCategories, setP
 
     const subTabClasses = (isActive: boolean) =>
       `px-4 py-2 text-sm font-medium rounded-md transition-colors whitespace-nowrap ${
-        isActive ? 'bg-honda-red text-white shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+        isActive ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-800 shadow' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
       }`;
     
     const filteredData = useMemo(() => {
@@ -332,7 +332,7 @@ const PriceItemsView = ({ priceDatabase, setPriceDatabase, priceCategories, setP
                     <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" />
                     <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600 transition"><Upload size={16} /> Import</button>
                     <button onClick={handleExport} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600 transition"><Download size={16} /> Export</button>
-                    <button onClick={handleOpenCreateModal} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-honda-red rounded-lg hover:bg-red-700 transition shadow"><Plus size={16} /> Tambah</button>
+                    <button onClick={handleOpenCreateModal} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-destructive-foreground bg-destructive rounded-lg hover:bg-destructive/90 transition shadow"><Plus size={16} /> Tambah</button>
                 </div>
             </div>
             <div className="flex items-center gap-2 mb-4 text-sm text-gray-600 dark:text-gray-300">
@@ -401,6 +401,9 @@ const WorkItemsView = ({ workItems, setWorkItems, workCategories, setWorkCategor
     const [isAdminAuthModalOpen, setIsAdminAuthModalOpen] = useState(false);
     const [onAdminAuthSuccess, setOnAdminAuthSuccess] = useState<(() => void) | null>(null);
 
+    const location = useLocation();
+    const isRabModule = location.pathname.startsWith('/rab');
+
     const requestAdminAuth = (callback: () => void) => {
         setOnAdminAuthSuccess(() => callback);
         setIsAdminAuthModalOpen(true);
@@ -415,6 +418,21 @@ const WorkItemsView = ({ workItems, setWorkItems, workCategories, setWorkCategor
             })
             .sort((a, b) => new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime());
     }, [workItems, searchTerm, categoryFilter]);
+
+    const groupedData = useMemo(() => {
+        return filteredData.reduce((acc, item) => {
+            const category = item.category;
+            if (!acc[category]) {
+                acc[category] = [];
+            }
+            acc[category].push(item);
+            return acc;
+        }, {} as Record<string, WorkItem[]>);
+    }, [filteredData]);
+
+    const orderedCategories = useMemo(() => {
+        return workCategories.filter(cat => groupedData[cat] && groupedData[cat].length > 0);
+    }, [workCategories, groupedData]);
     
     const handleOpenCreateModal = () => { setEditingItem(null); setIsModalOpen(true); };
     const handleOpenEditModal = (item: WorkItem) => { setEditingItem(item); setIsModalOpen(true); };
@@ -458,6 +476,13 @@ const WorkItemsView = ({ workItems, setWorkItems, workCategories, setWorkCategor
         setEditingAhsItem(null);
         toast.success(`AHS default untuk "${updatedItem.name}" berhasil disimpan.`);
     };
+    
+    const colWidths = isRabModule ? {
+        name: 'w-[35%]', category: 'w-[12%]', unit: 'w-[8%]', price: 'w-[15%]', source: 'w-[8%]', updated: 'w-[12%]', actions: 'w-[10%]'
+    } : {
+        name: 'w-[45%]', category: 'w-[15%]', unit: '', price: '', source: 'w-[10%]', updated: 'w-[15%]', actions: 'w-[15%]'
+    };
+
 
     return (
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md dark:border dark:border-gray-700">
@@ -485,35 +510,48 @@ const WorkItemsView = ({ workItems, setWorkItems, workCategories, setWorkCategor
                     <div className="relative"><select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value as any)} className="appearance-none w-full sm:w-auto text-sm p-2 pl-4 pr-8 border-gray-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-honda-red focus:border-transparent transition bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-200"><option value="all">Semua Kategori</option>{workCategories.map(c => <option key={c} value={c}>{c}</option>)}</select><Filter className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400" size={16} /></div>
                      <button onClick={() => setIsManageCatModalOpen(true)} className="text-sm text-gray-600 dark:text-gray-300 hover:text-honda-red dark:hover:text-honda-red flex items-center gap-1"><Settings size={14} /> Kelola Kategori</button>
                 </div>
-                <div className="flex items-center gap-2 w-full md:w-auto"><button onClick={() => requestAdminAuth(handleOpenCreateModal)} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-honda-red rounded-lg hover:bg-red-700 transition shadow"><Plus size={16} /> Tambah Pekerjaan</button></div>
+                <div className="flex items-center gap-2 w-full md:w-auto"><button onClick={() => requestAdminAuth(handleOpenCreateModal)} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-destructive-foreground bg-destructive rounded-lg hover:bg-destructive/90 transition shadow"><Plus size={16} /> Tambah Pekerjaan</button></div>
             </div>
             <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 table-fixed">
                     <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50">
                         <tr>
-                            <th scope="col" className="px-6 py-3">Nama Pekerjaan</th>
-                            <th scope="col" className="px-6 py-3">Kategori</th>
-                            <th scope="col" className="px-6 py-3">Sumber</th>
-                            <th scope="col" className="px-6 py-3">Update Terakhir</th>
-                            <th scope="col" className="px-6 py-3 text-center">Aksi</th>
+                            <th scope="col" className={`px-6 py-3 ${colWidths.name}`}>Nama Pekerjaan</th>
+                            <th scope="col" className={`px-6 py-3 ${colWidths.category}`}>Kategori</th>
+                            {isRabModule && <th scope="col" className={`px-6 py-3 text-center ${colWidths.unit}`}>Satuan</th>}
+                            {isRabModule && <th scope="col" className={`px-6 py-3 text-right ${colWidths.price}`}>Harga Satuan</th>}
+                            <th scope="col" className={`px-6 py-3 ${colWidths.source}`}>Sumber</th>
+                            <th scope="col" className={`px-6 py-3 ${colWidths.updated}`}>Update Terakhir</th>
+                            <th scope="col" className={`px-6 py-3 text-center ${colWidths.actions}`}>Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredData.map((item) => (
-                            <tr key={item.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                                <th scope="row" className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">{item.name}</th>
-                                <td className="px-6 py-4">{item.category}</td>
-                                <td className="px-6 py-4">{item.source}</td>
-                                <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{formatDate(item.lastUpdated)}</td>
-                                <td className="px-6 py-4 text-center">
-                                    <WorkItemsActionMenu 
-                                        item={item} 
-                                        onEdit={() => requestAdminAuth(() => handleOpenEditModal(item))} 
-                                        onDelete={() => requestAdminAuth(() => handleDeleteRequest(item.id))}
-                                        onEditAhs={() => requestAdminAuth(() => handleOpenAhsModal(item))}
-                                    />
-                                </td>
-                            </tr>
+                         {orderedCategories.map(category => (
+                            <React.Fragment key={category}>
+                                <tr>
+                                    <td colSpan={isRabModule ? 7 : 5} className="px-6 py-3 bg-gray-100 dark:bg-gray-700/80 font-bold text-gray-800 dark:text-gray-200 text-sm sticky top-0 z-[5]">
+                                        {category}
+                                    </td>
+                                </tr>
+                                {groupedData[category].map((item) => (
+                                    <tr key={item.id} className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                        <th scope="row" className="px-6 py-4 font-medium text-gray-900 dark:text-white break-words">{item.name}</th>
+                                        <td className="px-6 py-4 break-words">{item.category}</td>
+                                        {isRabModule && <td className="px-6 py-4 text-center">{item.unit}</td>}
+                                        {isRabModule && <td className="px-6 py-4 text-right font-semibold text-gray-800 dark:text-gray-100">{formatCurrency(item.defaultPrice)}</td>}
+                                        <td className="px-6 py-4">{item.source}</td>
+                                        <td className="px-6 py-4 text-gray-600 dark:text-gray-400">{formatDate(item.lastUpdated)}</td>
+                                        <td className="px-6 py-4 text-center">
+                                            <WorkItemsActionMenu 
+                                                item={item} 
+                                                onEdit={() => requestAdminAuth(() => handleOpenEditModal(item))} 
+                                                onDelete={() => requestAdminAuth(() => handleDeleteRequest(item.id))}
+                                                onEditAhs={() => requestAdminAuth(() => handleOpenAhsModal(item))}
+                                            />
+                                        </td>
+                                    </tr>
+                                ))}
+                            </React.Fragment>
                         ))}
                     </tbody>
                 </table>

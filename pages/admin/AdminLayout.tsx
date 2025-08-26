@@ -8,15 +8,18 @@ import { type Project, type RabDocument, type PriceDatabaseItem, type WorkItem }
 interface AdminLayoutProps {
   projects: Project[];
   rabData: RabDocument[];
+  bqData: RabDocument[];
   priceDatabase: PriceDatabaseItem[];
   workItems: WorkItem[];
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
   setRabData: React.Dispatch<React.SetStateAction<RabDocument[]>>;
+  setBqData: React.Dispatch<React.SetStateAction<RabDocument[]>>;
   setPriceDatabase: React.Dispatch<React.SetStateAction<PriceDatabaseItem[]>>;
   setWorkItems: React.Dispatch<React.SetStateAction<WorkItem[]>>;
   initialData: {
     initialProjects: Project[];
     initialRabData: RabDocument[];
+    initialBqData: RabDocument[];
     initialPriceDatabase: PriceDatabaseItem[];
     initialWorkItems: WorkItem[];
   };

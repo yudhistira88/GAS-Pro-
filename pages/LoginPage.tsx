@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { AuthContext } from '../contexts/AuthContext';
+import { LogContext } from '../contexts/LogContext';
 import toast, { Toaster } from 'react-hot-toast';
 import { Eye, EyeOff, User, Lock, Loader2, Building2 } from 'lucide-react';
 
@@ -10,6 +11,7 @@ const LoginPage = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const { login } = useContext(AuthContext);
+    const { addLog } = useContext(LogContext);
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -23,9 +25,11 @@ const LoginPage = () => {
             const success = login(email, password);
             if (success) {
                 toast.success('Login berhasil!');
+                addLog({ level: 'INFO', user: email, action: 'LOGIN_SUCCESS', details: 'User logged in successfully.' });
                 navigate(from, { replace: true });
             } else {
                 toast.error('User Name atau Kata Sandi salah.');
+                addLog({ level: 'WARNING', user: email, action: 'LOGIN_FAILURE', details: 'Failed login attempt.' });
                 setIsLoading(false);
             }
         }, 500);

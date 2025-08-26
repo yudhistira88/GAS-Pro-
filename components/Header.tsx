@@ -9,9 +9,18 @@ import { AuthContext } from '../contexts/AuthContext';
 
 interface HeaderProps {
     onMenuClick: () => void;
+    notifications: any[];
+    setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
-const Header = ({ onMenuClick }: HeaderProps) => {
+const icons: { [key: string]: React.ReactElement } = {
+  CheckCircle: <CheckCircle className="text-green-500" />,
+  Clock: <Clock className="text-yellow-500" />,
+  MessageSquare: <MessageSquare className="text-blue-500" />,
+  Server: <Server className="text-muted-foreground" />,
+};
+
+const Header = ({ onMenuClick, notifications, setNotifications }: HeaderProps) => {
   const { theme, toggleTheme } = useContext(ThemeContext);
   const { currentUser, logout } = useContext(AuthContext);
   const navigate = ReactRouterDOM.useNavigate();
@@ -21,13 +30,6 @@ const Header = ({ onMenuClick }: HeaderProps) => {
   const notificationsRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   
-  const [notifications, setNotifications] = useState([
-    { id: 1, text: 'RAB #RAB005 telah disetujui.', time: '5 menit lalu', read: false, icon: <CheckCircle className="text-green-500" /> },
-    { id: 2, text: 'Proyek "Website E-commerce Klien A" mendekati tenggat waktu.', time: '2 jam lalu', read: false, icon: <Clock className="text-yellow-500" /> },
-    { id: 3, text: 'Komentar baru pada Laporan Proyek "Pembangunan Kantor Cabang".', time: '1 hari lalu', read: true, icon: <MessageSquare className="text-blue-500" /> },
-    { id: 4, text: 'Pemeliharaan sistem dijadwalkan malam ini pukul 23:00.', time: '2 hari lalu', read: true, icon: <Server className="text-muted-foreground" /> },
-  ]);
-
   const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
@@ -49,9 +51,17 @@ const Header = ({ onMenuClick }: HeaderProps) => {
     logout();
     navigate('/login');
   };
+  
+  const handleMarkAsRead = (id: number) => {
+    setNotifications(currentNotifications =>
+      currentNotifications.map(n => (n.id === id ? { ...n, read: true } : n))
+    );
+  };
 
   const handleMarkAllAsRead = () => {
-      setNotifications(notifications.map(n => ({ ...n, read: true })));
+      setNotifications(currentNotifications =>
+        currentNotifications.map(n => ({ ...n, read: true }))
+      );
       setIsNotificationsOpen(false);
   }
   
@@ -78,7 +88,7 @@ const Header = ({ onMenuClick }: HeaderProps) => {
           className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           aria-label="Toggle theme"
         >
-          {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+          {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
         </button>
         
         {/* Notifications Dropdown */}
@@ -95,13 +105,20 @@ const Header = ({ onMenuClick }: HeaderProps) => {
                     </div>
                     <div className="max-h-80 overflow-y-auto">
                         {notifications.map(notif => (
-                            <div key={notif.id} className={`flex items-start gap-3 p-3 border-b ${!notif.read ? 'bg-primary/5' : ''}`}>
-                                <div className="flex-shrink-0 mt-1">{notif.icon}</div>
-                                <div>
-                                    <p className="text-sm text-foreground">{notif.text}</p>
-                                    <p className="text-xs text-muted-foreground">{notif.time}</p>
-                                </div>
-                            </div>
+                            <ReactRouterDOM.Link
+                              key={notif.id}
+                              to={notif.link || '#'}
+                              onClick={() => handleMarkAsRead(notif.id)}
+                              className={`block hover:bg-muted ${!notif.read ? 'bg-primary/5' : ''}`}
+                            >
+                              <div className="flex items-start gap-3 p-3 border-b">
+                                  <div className="flex-shrink-0 mt-1">{icons[notif.icon] || <Bell />}</div>
+                                  <div>
+                                      <p className="text-sm text-foreground">{notif.text}</p>
+                                      <p className="text-xs text-muted-foreground">{notif.time}</p>
+                                  </div>
+                              </div>
+                            </ReactRouterDOM.Link>
                         ))}
                     </div>
                     <div className="p-2 text-center border-t">
@@ -123,7 +140,7 @@ const Header = ({ onMenuClick }: HeaderProps) => {
                       <ReactRouterDOM.Link to="/admin" onClick={() => setIsUserMenuOpen(false)} className={dropdownItemClasses}><Shield size={16} className="mr-2"/> Panel Admin</ReactRouterDOM.Link>
                     )}
                     <ReactRouterDOM.Link to="/profile" onClick={() => setIsUserMenuOpen(false)} className={dropdownItemClasses}><User size={16} className="mr-2"/> Profil</ReactRouterDOM.Link>
-                    <ReactRouterDOM.Link to="#" onClick={() => setIsUserMenuOpen(false)} className={dropdownItemClasses}><Settings size={16} className="mr-2"/> Pengaturan</ReactRouterDOM.Link>
+                    <ReactRouterDOM.Link to="/settings" onClick={() => setIsUserMenuOpen(false)} className={dropdownItemClasses}><Settings size={16} className="mr-2"/> Pengaturan</ReactRouterDOM.Link>
                     <div className="border-t my-1 border-border"></div>
                     <button onClick={handleLogout} className={`${dropdownItemClasses} text-destructive`}><LogOut size={16} className="mr-2"/> Keluar</button>
                  </div>

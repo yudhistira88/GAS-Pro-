@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { type RabItem, type AhsComponent, type RabDetailItem } from '../types';
 
@@ -269,34 +270,35 @@ export interface DynamicQuestion {
 }
 
 /**
- * Step 1: Generate clarifying questions based on initial project details.
- * @param promptDetails Initial details of the project.
- * @returns A promise resolving to an array of questions for the user.
+ * Generates a Bill of Quantities (BQ) from a rich set of project details in a single call.
+ * @param details The initial details of the project.
+ * @returns A promise that resolves to an array of BQ items.
  */
-export async function generateBqQuestions(promptDetails: BqPromptDetails): Promise<DynamicQuestion[]> {
-    const systemInstruction = `Anda adalah seorang Quantity Surveyor (QS) ahli. Berdasarkan detail awal sebuah proyek konstruksi, tugas Anda adalah membuat daftar pertanyaan lanjutan yang relevan untuk memperjelas ruang lingkup pekerjaan dan membuat Bill of Quantity (BQ) yang akurat.
-    - Ajukan 3-5 pertanyaan paling penting.
-    - Pertanyaan harus singkat dan jelas.
-    - Berikan 'key' unik untuk setiap pertanyaan (snake_case).
-    - Tentukan 'type' input yang diharapkan ('text' atau 'number').
-    - Keluarkan output HANYA dalam format array JSON yang valid. Jangan ada penjelasan atau markdown.
-    Contoh: Jika judul proyek "Pembangunan Rumah Tinggal 2 Lantai", pertanyaan bisa tentang luas bangunan, jumlah kamar mandi, atau material atap.`;
+export async function generateBqStructure(details: BqPromptDetails): Promise<Omit<RabDetailItem, 'id' | 'isEditing' | 'isSaved'>[]> {
+    const systemInstruction = `Anda adalah seorang Quantity Surveyor (QS) ahli untuk proyek konstruksi di Indonesia. Berdasarkan detail proyek yang diberikan, buat struktur Bill of Quantity (BQ) yang terdiri dari kategori pekerjaan utama dan item pekerjaan di bawahnya.
+    - Keluarkan output HANYA dalam format array JSON yang valid.
+    - Setiap elemen dalam array adalah objek dengan skema: { "type": "category" | "item", "uraianPekerjaan": string, "volume": number, "satuan": string }.
+    - Untuk "category", volume harus 0 dan satuan kosong.
+    - Untuk "item", berikan estimasi volume yang masuk akal.
+    - Urutkan item di bawah kategori yang sesuai.`;
 
-    const prompt = `Buatkan pertanyaan lanjutan untuk proyek berikut:
-    - Judul: "${promptDetails.projectTitle}"
-    - Durasi: ${promptDetails.duration} hari
-    - Lokasi: "${promptDetails.location}"`;
-
+    const prompt = `Buatkan struktur BQ untuk proyek berikut:
+    - Judul: "${details.projectTitle}"
+    - Durasi: ${details.duration} hari
+    - Lokasi: "${details.location}"
+    - Tipe Pekerja: "${details.workerType}"`;
+    
     const responseSchema = {
         type: Type.ARRAY,
         items: {
             type: Type.OBJECT,
             properties: {
-                key: { type: Type.STRING, description: 'Kunci unik format snake_case.' },
-                question: { type: Type.STRING, description: 'Pertanyaan untuk pengguna.' },
-                type: { type: Type.STRING, description: 'Tipe input: "text" atau "number".' }
+                type: { type: Type.STRING },
+                uraianPekerjaan: { type: Type.STRING },
+                volume: { type: Type.NUMBER },
+                satuan: { type: Type.STRING }
             },
-            required: ["key", "question", "type"]
+            required: ["type", "uraianPekerjaan", "volume", "satuan"]
         }
     };
 
@@ -306,123 +308,22 @@ export async function generateBqQuestions(promptDetails: BqPromptDetails): Promi
             contents: prompt,
             config: {
                 systemInstruction,
-                temperature: 0.3,
+                temperature: 0.5,
                 responseMimeType: "application/json",
                 responseSchema: responseSchema,
             }
         });
-        const jsonText = response.text.trim();
-        const questions = JSON.parse(jsonText);
-        if (Array.isArray(questions)) {
-            return questions;
+        const result = JSON.parse(response.text.trim());
+        if (Array.isArray(result)) {
+            return result.map(item => ({
+                ...item,
+                hargaSatuan: 0,
+                keterangan: '',
+            }));
         }
-        throw new Error("AI did not return a valid array of questions.");
+        throw new Error("AI did not return a valid BQ structure array.");
     } catch (error) {
-        console.error("Error calling Gemini API for BQ questions:", error);
-        throw new Error("Gagal membuat pertanyaan BQ dari AI.");
+        console.error("Error calling Gemini API for BQ structure:", error);
+        throw new Error("Gagal membuat struktur BQ dari AI.");
     }
-}
-
-/**
- * Step 2: Generates a Bill of Quantities (BQ) from a rich set of project details.
- * @param details The initial details plus user answers to dynamic questions.
- * @returns A promise that resolves to an array of BQ items.
- */
-export async function generateBqFromDetails(details: {
-    promptDetails: BqPromptDetails;
-    answers: Record<string, string | number>;
-    questions: DynamicQuestion[];
-}): Promise<Omit<RabDetailItem, 'id' | 'isEditing' | 'isSaved'>[]> {
-    
-    let fullContext = `Detail Proyek Awal:
-- Judul: "${details.promptDetails.projectTitle}"
-- Durasi: ${details.promptDetails.duration} hari
-- Lokasi: "${details.promptDetails.location}"
-- Tipe Pekerja: "${details.promptDetails.workerType}"
-
-Detail Tambahan dari Pengguna:`;
-
-    details.questions.forEach(q => {
-        const answer = details.answers[q.key];
-        if (answer) {
-            fullContext += `\n- Pertanyaan: ${q.question}\n  Jawaban: ${answer}`;
-        }
-    });
-
-    const fullBq: Omit<RabDetailItem, 'id' | 'isEditing' | 'isSaved'>[] = [];
-
-    // --- STEP 2a: Generate Categories from detailed context ---
-    const categorySystemInstruction = `Anda adalah asisten ahli untuk membuat Bill of Quantity (BQ) untuk proyek konstruksi di Indonesia. Berdasarkan detail proyek yang lengkap, buat daftar NAMA KATEGORI pekerjaan utama.
-    Keluarkan output HANYA dalam format array JSON string yang valid. Contoh: ["PEKERJAAN PERSIAPAN", "PEKERJAAN STRUKTUR"]. Jangan ada penjelasan lain.`;
-    
-    const categoryPrompt = `Buatkan daftar nama kategori BQ untuk proyek dengan detail berikut:\n${fullContext}`;
-    const categoryResponseSchema = { type: Type.ARRAY, items: { type: Type.STRING } };
-
-    let categories: string[] = [];
-    try {
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: categoryPrompt,
-            config: { systemInstruction: categorySystemInstruction, temperature: 0.2, responseMimeType: "application/json", responseSchema: categoryResponseSchema }
-        });
-        categories = JSON.parse(response.text.trim());
-        if (!Array.isArray(categories) || categories.some(c => typeof c !== 'string')) {
-             throw new Error("API did not return a valid string array of categories.");
-        }
-    } catch (error) {
-        console.error("Error calling Gemini API for BQ categories:", error);
-        throw new Error("Gagal membuat kategori BQ dari AI.");
-    }
-    
-    if (categories.length === 0) {
-        throw new Error("AI tidak menghasilkan kategori BQ.");
-    }
-
-    // --- STEP 2b: Generate Items for Each Category from detailed context ---
-    const itemSystemInstruction = `Anda adalah asisten ahli BQ. Untuk sebuah proyek dan satu kategori pekerjaan, buat daftar item pekerjaan di bawahnya berdasarkan detail lengkap yang diberikan.
-    Keluarkan output HANYA dalam format array JSON yang valid.
-    Skema untuk setiap objek dalam array: { "uraianPekerjaan": "Nama item pekerjaan", "volume": number, "satuan": "string" }.
-    Volume harus estimasi yang masuk akal. Jangan sertakan 'type' atau harga.`;
-
-    const itemResponseSchema = {
-        type: Type.ARRAY,
-        items: {
-            type: Type.OBJECT,
-            properties: { uraianPekerjaan: { type: Type.STRING }, volume: { type: Type.NUMBER }, satuan: { type: Type.STRING } },
-            required: ["uraianPekerjaan", "volume", "satuan"]
-        }
-    };
-    
-    for (const categoryName of categories) {
-        fullBq.push({ type: 'category', uraianPekerjaan: categoryName.toUpperCase(), volume: 0, satuan: '', hargaSatuan: 0, keterangan: '' });
-        const itemPrompt = `Proyek:\n${fullContext}\n\nBuatkan item-item pekerjaan BQ untuk kategori: "${categoryName}".`;
-
-        try {
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: itemPrompt,
-                config: { systemInstruction: itemSystemInstruction, temperature: 0.5, responseMimeType: "application/json", responseSchema: itemResponseSchema }
-            });
-            const items = JSON.parse(response.text.trim());
-            
-            if (Array.isArray(items)) {
-                fullBq.push(...items.map(item => ({
-                    type: 'item' as const,
-                    uraianPekerjaan: item.uraianPekerjaan || '',
-                    volume: item.volume || 0,
-                    satuan: item.satuan || 'unit',
-                    hargaSatuan: 0,
-                    keterangan: '',
-                })));
-            }
-        } catch (error) {
-             console.error(`Error generating items for category "${categoryName}":`, error);
-             fullBq.push({
-                type: 'item', uraianPekerjaan: `Gagal generate item untuk kategori ini`, volume: 1, satuan: 'ls', hargaSatuan: 0,
-                keterangan: 'Terjadi error saat menghubungi AI. Coba lagi atau isi manual.',
-             });
-        }
-    }
-
-    return fullBq;
 }

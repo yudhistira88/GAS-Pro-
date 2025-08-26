@@ -1,6 +1,6 @@
 import React, { useContext, useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { Briefcase, FileText, CheckCircle } from 'lucide-react';
+import { Briefcase, FileText, CheckCircle, Clock } from 'lucide-react';
 import StatCard from '../components/StatCard';
 import { ThemeContext } from '../contexts/ThemeContext';
 import { type Project, type RabDocument } from '../types';
@@ -33,6 +33,15 @@ interface DashboardProps {
   bqData: RabDocument[];
 }
 
+// Helper functions for stat cards
+const calculateTotalBudget = (doc: RabDocument) => doc.detailItems.reduce((sum, item) => sum + (item.volume * item.hargaSatuan), 0);
+const formatShortCurrency = (num: number) => {
+    if (num >= 1e9) return 'Rp ' + (num / 1e9).toFixed(1).replace('.', ',') + ' M';
+    if (num >= 1e6) return 'Rp ' + (num / 1e6).toFixed(1).replace('.', ',') + ' Jt';
+    return 'Rp ' + new Intl.NumberFormat('id-ID').format(num);
+};
+
+
 const Dashboard = ({ projects, rabData, bqData }: DashboardProps) => {
     const { theme } = useContext(ThemeContext);
 
@@ -49,7 +58,40 @@ const Dashboard = ({ projects, rabData, bqData }: DashboardProps) => {
         }));
     }, [projects]);
     
-    const completedTasks = useMemo(() => projects.filter(p => p.status === 'Completed').length, [projects]);
+    const dashboardStats = useMemo(() => {
+        // Project Stats
+        const activeProjects = projects.filter(p => p.status === 'In Progress');
+        const nearingDeadlineCount = activeProjects.filter(p => {
+            const dueDate = new Date(p.dueDate);
+            const today = new Date();
+            const diffTime = dueDate.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays > 0 && diffDays <= 14;
+        }).length;
+        const completedProjectsCount = projects.filter(p => p.status === 'Completed').length;
+        const completionRate = projects.length > 0 ? (completedProjectsCount / projects.length) * 100 : 0;
+
+        // Document Stats
+        const approvedRabData = rabData.filter(d => ['Approved', 'Completed'].includes(d.status));
+        const totalRabValue = approvedRabData.reduce((sum, doc) => sum + calculateTotalBudget(doc), 0);
+        const totalTenderValue = approvedRabData.reduce((sum, doc) => sum + (doc.tenderValue || 0), 0);
+
+        const pendingBqCount = bqData.filter(d => ['Pending', 'Menunggu Approval'].includes(d.status)).length;
+        const pendingRabCount = rabData.filter(d => ['Pending', 'Menunggu Approval'].includes(d.status)).length;
+        const pendingDocsCount = pendingBqCount + pendingRabCount;
+
+        return {
+            activeProjectsCount: activeProjects.length,
+            nearingDeadlineCount,
+            completedProjectsCount,
+            completionRate,
+            totalRabValue,
+            totalTenderValue,
+            pendingBqCount,
+            pendingRabCount,
+            pendingDocsCount,
+        };
+    }, [projects, rabData, bqData]);
 
     const tickColor = useMemo(() => (theme === 'dark' ? '#94a3b8' : '#475569'), [theme]);
     
@@ -59,6 +101,20 @@ const Dashboard = ({ projects, rabData, bqData }: DashboardProps) => {
         borderRadius: 'var(--radius)',
         color: 'hsl(var(--popover-foreground))'
     }), [theme]);
+
+    const RADIAN = Math.PI / 180;
+    const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+        if (percent < 0.07) return null;
+        const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+        const x = cx + radius * Math.cos(-midAngle * RADIAN);
+        const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+        return (
+            <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize="12" fontWeight="bold">
+                {`${(percent * 100).toFixed(0)}%`}
+            </text>
+        );
+    };
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -70,23 +126,46 @@ const Dashboard = ({ projects, rabData, bqData }: DashboardProps) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           icon={<Briefcase />} 
-          title="Total Proyek" 
-          value={projects.length.toString()}
+          title="Proyek Aktif" 
+          value={dashboardStats.activeProjectsCount.toString()}
+          subtitle={
+            <span className={dashboardStats.nearingDeadlineCount > 0 ? "text-orange-500 font-semibold" : "text-green-500 font-semibold"}>
+                {dashboardStats.nearingDeadlineCount > 0 
+                    ? `${dashboardStats.nearingDeadlineCount} proyek mendekati tenggat`
+                    : "Semua proyek sesuai jadwal"
+                }
+            </span>
+          }
         />
         <StatCard 
           icon={<FileText />} 
-          title="Total BQ" 
-          value={bqData.length.toString()} 
+          title="Nilai Total RAB Disetujui" 
+          value={formatShortCurrency(dashboardStats.totalRabValue)}
+          subtitle={
+            <span>
+                vs. {formatShortCurrency(dashboardStats.totalTenderValue)} Nilai Tender
+            </span>
+          }
         />
         <StatCard 
-          icon={<FileText />} 
-          title="Total RAB" 
-          value={rabData.length.toString()} 
+          icon={<Clock />} 
+          title="Menunggu Persetujuan" 
+          value={dashboardStats.pendingDocsCount.toString()} 
+          subtitle={
+            <span className="text-blue-500 font-semibold">
+                {`${dashboardStats.pendingBqCount} BQ & ${dashboardStats.pendingRabCount} RAB`}
+            </span>
+          }
         />
         <StatCard 
           icon={<CheckCircle />} 
-          title="Proyek Selesai" 
-          value={completedTasks.toString()}
+          title="Tingkat Penyelesaian" 
+          value={`${dashboardStats.completionRate.toFixed(0)}%`}
+          subtitle={
+             <span>
+                {`${dashboardStats.completedProjectsCount} dari ${projects.length} proyek selesai`}
+            </span>
+          }
         />
       </div>
 
@@ -122,7 +201,7 @@ const Dashboard = ({ projects, rabData, bqData }: DashboardProps) => {
 
         <div className="lg:col-span-2 bg-card p-6 rounded-lg border shadow-sm">
           <h2 className="text-lg font-semibold text-card-foreground mb-4">Status Proyek</h2>
-          <div style={{ width: '100%', height: 250 }}>
+          <div className="relative w-full h-[250px]">
             <ResponsiveContainer>
               <PieChart>
                 <Pie
@@ -130,6 +209,7 @@ const Dashboard = ({ projects, rabData, bqData }: DashboardProps) => {
                   cx="50%"
                   cy="50%"
                   labelLine={false}
+                  label={renderCustomizedLabel}
                   outerRadius={80}
                   innerRadius={50}
                   fill="#8884d8"
@@ -148,6 +228,12 @@ const Dashboard = ({ projects, rabData, bqData }: DashboardProps) => {
                 <Legend iconSize={10} wrapperStyle={{fontSize: '12px', color: tickColor}}/>
               </PieChart>
             </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-3xl font-bold text-foreground">
+                    {projects.length}
+                </span>
+                <span className="text-sm text-muted-foreground">Total Proyek</span>
+            </div>
           </div>
         </div>
       </div>

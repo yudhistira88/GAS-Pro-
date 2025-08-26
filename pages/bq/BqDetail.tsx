@@ -1,7 +1,13 @@
+
+
+
+
+
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { type RabDocument, type RabDetailItem, type AhsComponent, type PriceDatabaseItem, type WorkItem } from '../../types';
-import { Plus, Trash2, ArrowLeft, Save, Pencil, Check, Zap, Loader2, ArrowUp, ArrowDown, FileText, X, ChevronDown, Database, SlidersHorizontal, AlertTriangle, Layers, Calculator, Wand2, CheckCircle, Send, Upload, Download, FileDown, Lock, Edit, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Save, Pencil, Check, Zap, Loader2, ArrowUp, ArrowDown, FileText, X, ChevronDown, Database, SlidersHorizontal, AlertTriangle, Layers, Calculator, Wand2, CheckCircle, Send, Upload, Download, FileDown, Lock, Edit, RotateCcw, PlusCircle } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { generateAhsForSingleItem } from '../../services/geminiService';
 import jsPDF from 'jspdf';
@@ -89,8 +95,7 @@ const MissingItemsModal = ({ isOpen, onClose, missingItems, onStartAhsCreation, 
 
 interface BqDetailRowProps {
     item: RabDetailItem;
-    categoryIndex: number;
-    itemIndex: number;
+    itemNumberString: string;
     rowIndex: number;
     totalRows: number;
     onUpdate: (id: string, field: keyof RabDetailItem, value: any) => void;
@@ -99,9 +104,10 @@ interface BqDetailRowProps {
     onSaveRow: (id: string) => void;
     onMove: (index: number, direction: 'up' | 'down') => void;
     isLocked: boolean;
+    onAddSubItem: (id: string) => void;
 }
 
-const BqDetailRow = React.memo(({ item, categoryIndex, itemIndex, rowIndex, totalRows, onUpdate, onToggleDelete, onToggleEdit, onSaveRow, onMove, isLocked }: BqDetailRowProps) => {
+const BqDetailRow = React.memo(({ item, itemNumberString, rowIndex, totalRows, onUpdate, onToggleDelete, onToggleEdit, onSaveRow, onMove, isLocked, onAddSubItem }: BqDetailRowProps) => {
     const inputClasses = "w-full p-1 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-honda-red focus:border-transparent transition bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 text-xs placeholder-gray-400";
     const viewClasses = "block px-1 py-1 text-xs";
     const isCategory = item.type === 'category';
@@ -119,8 +125,25 @@ const BqDetailRow = React.memo(({ item, categoryIndex, itemIndex, rowIndex, tota
 
     const textClasses = isDeleted ? 'line-through' : '';
 
+    const indentLevel = item.indent || 0;
+    const indentPadding = { paddingLeft: `${indentLevel * 1.5}rem` };
+    
+    const handleVolumeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.currentTarget.blur(); // Trigger onBlur to calculate and update
+        }
+    };
+
+    const addSubItemTitle = item.type === 'category' ? 'Tambah Sub Kategori' : 'Tambah Sub Item';
+
     const actionButtons = (
         <div className="flex justify-center items-center gap-1">
+            {!isDeleted && (
+                <button disabled={isLocked} onClick={() => onAddSubItem(item.id)} className="p-1 text-gray-500 hover:text-green-600 dark:hover:text-green-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title={addSubItemTitle}>
+                    <PlusCircle size={12}/>
+                </button>
+            )}
             {!isDeleted && (canEdit ? (
                 <button onClick={() => onSaveRow(item.id)} className="p-1 text-green-600 hover:text-green-700 dark:hover:text-green-400 transition-colors" title="Simpan Baris"><Check size={12}/></button>
             ) : (
@@ -134,7 +157,7 @@ const BqDetailRow = React.memo(({ item, categoryIndex, itemIndex, rowIndex, tota
 
     const moveButtons = (
         <div className="flex items-center justify-center gap-x-1 h-full">
-            <span className={`text-xs text-gray-800 dark:text-gray-300 w-5 text-center ${isCategory ? 'font-bold' : ''}`}>{isCategory ? romanize(categoryIndex) : `${itemIndex}`}</span>
+            <span className={`text-xs text-gray-800 dark:text-gray-300 w-10 text-center ${isCategory ? 'font-bold' : ''}`}>{itemNumberString}</span>
             <div className="flex flex-col">
                 <button onClick={() => onMove(rowIndex, 'up')} disabled={isLocked || rowIndex === 0} className="p-0.5 text-gray-400 hover:text-honda-red disabled:opacity-20 disabled:cursor-not-allowed" title="Pindah Atas"><ArrowUp size={10} /></button>
                 <button onClick={() => onMove(rowIndex, 'down')} disabled={isLocked || rowIndex === totalRows - 1} className="p-0.5 text-gray-400 hover:text-honda-red disabled:opacity-20 disabled:cursor-not-allowed" title="Pindah Bawah"><ArrowDown size={10} /></button>
@@ -144,15 +167,33 @@ const BqDetailRow = React.memo(({ item, categoryIndex, itemIndex, rowIndex, tota
 
     return (
         <tr className={rowClasses}>
-            <td className="px-1 py-1 text-center align-top w-16">{moveButtons}</td>
-            <td className="px-2 py-1 align-top min-w-[300px]">
+            <td className="px-1 py-1 text-center align-top w-20">{moveButtons}</td>
+            <td className="px-2 py-1 align-top min-w-[300px]" style={indentPadding}>
                 {canEdit ? (<AutoResizeTextarea value={item.uraianPekerjaan} onChange={(e) => onUpdate(item.id, 'uraianPekerjaan', e.target.value)} className={`${inputClasses} text-left ${isCategory ? 'font-bold text-xs' : 'text-xs'}`} />) : (<span className={`${viewClasses} ${textClasses}`}>{item.uraianPekerjaan}</span>)}
             </td>
             <td className="px-2 py-1 align-top w-24">
                 {canEdit && !isCategory ? (<input type="text" value={item.satuan} onChange={(e) => onUpdate(item.id, 'satuan', e.target.value)} className={`${inputClasses} text-center`} />) : (<span className={`${viewClasses} text-center ${textClasses}`}>{isCategory ? '' : item.satuan}</span>)}
             </td>
             <td className="px-2 py-1 align-top w-28">
-                {canEdit && !isCategory ? (<input type="number" value={item.volume} step="0.01" onChange={(e) => onUpdate(item.id, 'volume', parseFloat(e.target.value) || 0)} className={`${inputClasses} text-right`} min="0" />) : (<span className={`${viewClasses} text-right ${textClasses}`}>{isCategory ? '' : item.volume.toFixed(2).replace('.', ',')}</span>)}
+                {canEdit && !isCategory ? (<input type="text" defaultValue={item.volume !== null ? item.volume.toString().replace('.', ',') : ''} onKeyDown={handleVolumeKeyDown} onBlur={(e) => {
+                    const value = e.currentTarget.value;
+                    if (value.startsWith('=')) {
+                        const expression = value.substring(1).replace(/,/g, '.');
+                        try {
+                            const result = new Function('return ' + expression)();
+                            if (typeof result === 'number' && !isNaN(result)) {
+                                onUpdate(item.id, 'volume', result);
+                            } else {
+                                toast.error('Hasil formula tidak valid.');
+                            }
+                        } catch (err) {
+                            toast.error('Formula tidak valid.');
+                        }
+                    } else {
+                        const parsedValue = parseFloat(value.replace(',', '.'));
+                        onUpdate(item.id, 'volume', isNaN(parsedValue) ? null : parsedValue);
+                    }
+                }} className={`${inputClasses} text-right`} />) : (<span className={`${viewClasses} text-right ${textClasses}`}>{isCategory ? '' : (item.volume !== null ? item.volume.toFixed(2).replace('.', ',') : '')}</span>)}
             </td>
             <td className="px-2 py-1 align-top min-w-[150px]">
                 {canEdit ? (<AutoResizeTextarea value={item.keterangan} onChange={(e) => onUpdate(item.id, 'keterangan', e.target.value)} className={`${inputClasses} text-left`} />) : (<span className={`${viewClasses} ${textClasses}`}>{item.keterangan}</span>)}
@@ -236,12 +277,120 @@ const BqDetail = ({ bqData, setBqData, priceDatabase, setPriceDatabase, workItem
 
     const visibleItems = useMemo(() => sourceItems.filter(item => !item.isDeleted), [sourceItems]);
     
+    const itemNumbers = useMemo(() => {
+        const numberMap = new Map<string, string>();
+        let topLevelCategoryCounter = 0;
+        
+        // Map to store counters for children under a specific parent ID.
+        // The key is parentId, the value is an object { cat: count, item: count }
+        const counters = new Map<string, { cat: number, item: number }>();
+
+        visibleItems.forEach((item, index) => {
+            const indent = item.indent || 0;
+            let parent = null;
+            
+            // Find the direct parent
+            if (indent > 0) {
+                // This is more reliable than reverse().find() as it finds the *direct* parent.
+                for (let i = index - 1; i >= 0; i--) {
+                    if ((visibleItems[i].indent || 0) === indent - 1) {
+                        parent = visibleItems[i];
+                        break;
+                    }
+                }
+            }
+
+            if (item.type === 'category') {
+                if (indent === 0) {
+                    topLevelCategoryCounter++;
+                    const roman = romanize(topLevelCategoryCounter);
+                    numberMap.set(item.id, roman);
+                } else {
+                    if (parent) {
+                        const parentNumStr = numberMap.get(parent.id);
+                        const parentCounters = counters.get(parent.id) || { cat: 0, item: 0 };
+                        parentCounters.cat++;
+                        counters.set(parent.id, parentCounters);
+                        
+                        const newNumStr = `${parentNumStr}.${parentCounters.cat}`;
+                        numberMap.set(item.id, newNumStr);
+                    } else {
+                        numberMap.set(item.id, `?.?`);
+                    }
+                }
+            } else { // type === 'item'
+                if (parent) {
+                    const parentNumStr = numberMap.get(parent.id);
+                    const parentCounters = counters.get(parent.id) || { cat: 0, item: 0 };
+                    parentCounters.item++;
+                    counters.set(parent.id, parentCounters);
+                    
+                    const newNumStr = `${parentNumStr}.${parentCounters.item}`;
+                    numberMap.set(item.id, newNumStr);
+                } else {
+                    // This would be a top-level item without a category.
+                    // Fallback to a simple counter.
+                    const rootCounters = counters.get('root_items') || { cat: 0, item: 0 };
+                    rootCounters.item++;
+                    counters.set('root_items', rootCounters);
+                    numberMap.set(item.id, String(rootCounters.item));
+                }
+            }
+        });
+
+        return numberMap;
+    }, [visibleItems]);
+
+
     const handleItemChange = useCallback((id: string, field: keyof RabDetailItem, value: any) => { setDetailItems(currentItems => currentItems.map(item => item.id === id ? { ...item, [field]: value } : item)); setHasUnsavedChanges(true); }, []);
     const handleToggleEdit = useCallback((id: string) => setDetailItems(items => items.map(item => item.id === id ? { ...item, isEditing: !item.isEditing } : { ...item, isEditing: false })), []);
     const handleSaveRow = useCallback((id: string) => { setDetailItems(items => items.map(item => item.id === id ? { ...item, isEditing: false, isSaved: true } : item)); toast.success('Baris disimpan!'); setHasUnsavedChanges(true); }, []);
     const handleAddCategory = () => { setDetailItems([...detailItems, { id: `cat-${Date.now()}`, type: 'category', uraianPekerjaan: 'KATEGORI BARU', volume: 0, satuan: '', hargaSatuan: 0, keterangan: '', isEditing: true, isSaved: false, isNew: true }]); setHasUnsavedChanges(true); };
     const handleAddItem = () => { setDetailItems([...detailItems, { id: `item-${Date.now()}`, type: 'item', uraianPekerjaan: '', volume: 1.00, satuan: '', hargaSatuan: 0, keterangan: '', isEditing: true, isSaved: false, priceSource: 'manual', isNew: true }]); setHasUnsavedChanges(true); };
     
+    const handleAddSubItem = useCallback((parentId: string) => {
+        setDetailItems(currentItems => {
+            const parentIndex = currentItems.findIndex(i => i.id === parentId);
+            if (parentIndex === -1) return currentItems;
+    
+            const parentItem = currentItems[parentIndex];
+            const newType = parentItem.type === 'category' ? 'category' : 'item';
+            const newUraian = newType === 'category' ? 'SUB KATEGORI BARU' : 'Sub Item Baru';
+    
+            const parentIndent = parentItem.indent || 0;
+            const newIndent = parentIndent + 1;
+            
+            let insertAtIndex = parentIndex + 1;
+            // Find the end of the parent's children block
+            while (
+                insertAtIndex < currentItems.length && 
+                (currentItems[insertAtIndex].indent || 0) > parentIndent
+            ) {
+                insertAtIndex++;
+            }
+    
+            const newSubItem: RabDetailItem = {
+                id: `${newType}-${Date.now()}`,
+                type: newType,
+                uraianPekerjaan: newUraian,
+                volume: newType === 'item' ? 1.00 : 0,
+                satuan: '',
+                hargaSatuan: 0,
+                keterangan: '',
+                isEditing: true,
+                isSaved: false,
+                priceSource: newType === 'item' ? 'manual' : undefined,
+                isNew: true,
+                indent: newIndent,
+            };
+            
+            const newItems = [...currentItems];
+            newItems.splice(insertAtIndex, 0, newSubItem);
+            return newItems;
+        });
+        setHasUnsavedChanges(true);
+    }, []);
+
     const handleToggleDeleteItem = useCallback((id: string) => {
         const item = detailItems.find(i => i.id === id);
         if (!item) return;
@@ -365,7 +514,8 @@ const BqDetail = ({ bqData, setBqData, priceDatabase, setPriceDatabase, workItem
         doc.text(infoText, pageWidth / 2, 32, { align: 'center' });
 
         // --- 2. TABLE ---
-        const formatVol = (val: number) => {
+        const formatVol = (val: number | null) => {
+            if (val === null) return '';
             return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
         };
         
@@ -377,9 +527,6 @@ const BqDetail = ({ bqData, setBqData, priceDatabase, setPriceDatabase, workItem
 
         const head = [['NO', 'URAIAN PEKERJAAN', 'SAT', 'VOL', 'KETERANGAN']];
         
-        let categoryCounter = 0;
-        let itemCounter = 0;
-
         const displayedItems = sourceItems.filter(item => !item.isDeleted);
 
         const body = displayedItems.map(item => {
@@ -388,19 +535,18 @@ const BqDetail = ({ bqData, setBqData, priceDatabase, setPriceDatabase, workItem
             if (item.isDeleted) uraianText = `(DIHAPUS) ${uraianText}`;
 
             let rowData;
+            const itemNumber = itemNumbers.get(item.id) || '';
+
             if (item.type === 'category') {
-                categoryCounter++;
-                itemCounter = 0;
                 rowData = [
-                    { content: romanize(categoryCounter), styles: boldStyle },
+                    { content: itemNumber, styles: boldStyle },
                     { content: uraianText, styles: boldStyle },
                     '', '', 
                     { content: item.keterangan || '', styles: boldStyle }
                 ];
             } else {
-                itemCounter++;
                 rowData = [
-                    itemCounter.toString(),
+                    itemNumber,
                     uraianText,
                     item.satuan,
                     formatVol(item.volume),
@@ -410,6 +556,7 @@ const BqDetail = ({ bqData, setBqData, priceDatabase, setPriceDatabase, workItem
              (rowData as any).isNew = item.isNew;
             (rowData as any).isDeleted = item.isDeleted;
             (rowData as any).isCategory = item.type === 'category';
+            (rowData as any).indent = item.indent || 0;
             return rowData;
         });
 
@@ -421,15 +568,18 @@ const BqDetail = ({ bqData, setBqData, priceDatabase, setPriceDatabase, workItem
             headStyles: { fillColor: headerBgColor, textColor: defaultTextColor, fontStyle: 'bold', halign: 'center', valign: 'middle', fontSize: 7.5 },
             styles: { fontSize: 7.5, cellPadding: 2, valign: 'top', lineWidth: 0.1, lineColor: borderColor },
             columnStyles: {
-                0: { cellWidth: 10, halign: 'center' }, 
-                1: { cellWidth: 90, halign: 'left' }, 
+                0: { cellWidth: 15, halign: 'center' }, 
+                1: { cellWidth: 85, halign: 'left' }, 
                 2: { halign: 'center', cellWidth: 15 }, 
                 3: { halign: 'right', cellWidth: 15 }, 
                 4: { halign: 'left', cellWidth: 'auto' },
             },
             didParseCell: (data) => {
                 const rawData = data.row.raw as any;
-                if (rawData.isCategory) {
+                 if(data.column.index === 1 && rawData.indent > 0) {
+                     data.cell.styles.cellPadding = { ...data.cell.styles.cellPadding as any, left: (data.cell.styles.cellPadding as any).left + rawData.indent * 4 };
+                }
+                 if (rawData.isCategory) {
                     data.cell.styles.fillColor = categoryBgColor;
                     data.cell.styles.textColor = defaultTextColor;
                     data.cell.styles.fontStyle = 'bold';
@@ -489,7 +639,7 @@ const BqDetail = ({ bqData, setBqData, priceDatabase, setPriceDatabase, workItem
         } else {
             return doc.output('datauristring');
         }
-    }, [bq, sourceItems, creatorName, approverName, workDuration, revisionText]);
+    }, [bq, sourceItems, creatorName, approverName, workDuration, revisionText, itemNumbers]);
 
 
     const handleSaveData = () => {
@@ -520,7 +670,7 @@ const BqDetail = ({ bqData, setBqData, priceDatabase, setPriceDatabase, workItem
         const updatedBq: RabDocument = { 
             ...bq,
             isLocked: true, 
-            status: 'Terkunci',
+            status: 'Selesai',
             detailItems: detailItems.map(item => ({ ...item, isEditing: false, isSaved: true, isPricingLoading: false })),
             creatorName,
             approverName,
@@ -532,7 +682,7 @@ const BqDetail = ({ bqData, setBqData, priceDatabase, setPriceDatabase, workItem
             setBqData(prevBqData => prevBqData.map(r => r.id === bqId ? updatedBq : r));
             setHasUnsavedChanges(false);
             setIsSubmitting(false);
-            toast.success('BQ berhasil dikunci!');
+            toast.success('BQ berhasil dikunci dan ditandai Selesai!');
         }, 300);
     };
 
@@ -736,7 +886,6 @@ const BqDetail = ({ bqData, setBqData, priceDatabase, setPriceDatabase, workItem
 
     if (!bq) return <div className="text-center p-8 bg-gray-100 dark:bg-gray-900 h-screen flex items-center justify-center"><Loader2 className="animate-spin" size={32}/></div>;
     
-    let categoryCounter = 0; let itemCounter = 0;
     const inlineInputClass = "bg-transparent border-b border-gray-400/50 dark:border-gray-500/50 focus:border-honda-red focus:ring-0 focus:outline-none p-0 mx-1";
 
     return (
@@ -889,20 +1038,36 @@ const BqDetail = ({ bqData, setBqData, priceDatabase, setPriceDatabase, workItem
                         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                             <thead className="text-sm align-top text-gray-700 dark:text-gray-300 uppercase bg-gray-100 dark:bg-gray-700/50">
                                 <tr>
-                                    <th className="px-2 py-2 w-16 text-center font-semibold text-sm">No.</th>
+                                    <th className="px-2 py-2 w-20 text-center font-semibold text-sm">No.</th>
                                     <th className="px-2 py-2 min-w-[300px] font-semibold text-center text-sm">Uraian Pekerjaan</th>
                                     <th className="px-2 py-2 w-24 text-center font-semibold text-sm">Sat</th>
                                     <th className="px-2 py-2 w-28 text-center font-semibold text-sm">Vol</th>
                                     <th className="px-2 py-2 min-w-[150px] font-semibold text-center text-sm">Keterangan</th>
-                                    <th className="px-2 py-2 w-20 text-center font-semibold text-sm">Edit</th>
+                                    <th className="px-2 py-2 w-20 text-center font-semibold text-sm">AKSI</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {visibleItems.map((item, index) => { if(item.type === 'category') { categoryCounter++; itemCounter = 0; } else if(!item.isDeleted){ itemCounter++; } return <BqDetailRow key={item.id} item={item} categoryIndex={categoryCounter} itemIndex={itemCounter} rowIndex={sourceItems.findIndex(d => d.id === item.id)} totalRows={sourceItems.length} onUpdate={handleItemChange} onToggleDelete={handleToggleDeleteItem} onToggleEdit={handleToggleEdit} onSaveRow={handleSaveRow} onMove={handleMoveRow} isLocked={effectiveIsLocked} /> })}
+                                {visibleItems.map((item, index) => (
+                                    <BqDetailRow 
+                                        key={item.id} 
+                                        item={item}
+                                        itemNumberString={itemNumbers.get(item.id) || ''}
+                                        rowIndex={sourceItems.findIndex(d => d.id === item.id)} 
+                                        totalRows={sourceItems.length} 
+                                        onUpdate={handleItemChange} 
+                                        onToggleDelete={handleToggleDeleteItem} 
+                                        onToggleEdit={handleToggleEdit} 
+                                        onSaveRow={handleSaveRow} 
+                                        onMove={handleMoveRow} 
+                                        isLocked={effectiveIsLocked}
+                                        onAddSubItem={handleAddSubItem}
+                                     />
+                                 ))}
                             </tbody>
                         </table>
                     </div>
 
+                    
                     <div className="mt-8 border-t dark:border-gray-700 pt-6">
                         <div className="flex items-start text-xs italic text-gray-500 dark:text-gray-400">
                             <FileText size={18} className="mr-3 flex-shrink-0 mt-0.5 text-gray-400" />

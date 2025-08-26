@@ -1,11 +1,12 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useMemo } from 'react';
 import * as ReactRouterDOM from 'react-router-dom';
 import { type Project, type RabDocument, type PriceDatabaseItem, type WorkItem } from '../../types';
 import { Download, Upload, AlertTriangle, RefreshCw, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import ConfirmationModal from '../../components/ConfirmationModal';
-import { UserContext } from '../../contexts/UserContext'; // Using global user context
+import { UserContext, initialUsers } from '../../contexts/UserContext';
+import { LogContext, initialLogs } from '../../contexts/LogContext';
 
 interface DataManagementCardProps {
   title: string;
@@ -44,11 +45,68 @@ const DataManagementCard = ({ title, onExportJson, onExportXlsx, onImportJson }:
 
 
 const AdminPage = () => {
-  // Using context from the parent layout (`AdminLayout`) for data props
-  const { projects, rabData, priceDatabase, workItems, setProjects, setRabData, setPriceDatabase, setWorkItems, initialData } = ReactRouterDOM.useOutletContext<any>();
+  const { projects, rabData, bqData, priceDatabase, workItems, setProjects, setRabData, setBqData, setPriceDatabase, setWorkItems, initialData } = ReactRouterDOM.useOutletContext<any>();
+  const { users, setUsers } = useContext(UserContext);
+  const { logs, setLogs } = useContext(LogContext);
+  
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isFormatConfirmOpen, setIsFormatConfirmOpen] = useState(false);
-  const [isResetExceptDbConfirmOpen, setIsResetExceptDbConfirmOpen] = useState(false);
+  
+  const [selectedData, setSelectedData] = useState<Record<string, boolean>>({
+    proyek: false, rab: false, bq: false, dbHarga: false, dbPekerjaan: false, pengguna: false, log: false,
+  });
+  const [confirmAction, setConfirmAction] = useState<{type: 'format' | 'reset' | null}>({ type: null });
+
+  const dataMap = useMemo(() => ({
+    proyek: { name: 'Proyek', setter: setProjects, initial: initialData.initialProjects, formatValue: [] },
+    rab: { name: 'RAB', setter: setRabData, initial: initialData.initialRabData, formatValue: [] },
+    bq: { name: 'BQ', setter: setBqData, initial: initialData.initialBqData, formatValue: [] },
+    dbHarga: { name: 'Database Harga', setter: setPriceDatabase, initial: initialData.initialPriceDatabase, formatValue: [] },
+    dbPekerjaan: { name: 'Database Pekerjaan', setter: setWorkItems, initial: initialData.initialWorkItems, formatValue: [] },
+    pengguna: { name: 'Pengguna', setter: setUsers, initial: initialUsers, formatValue: initialUsers.filter(u => u.role === 'Admin') },
+    log: { name: 'Log Sistem', setter: setLogs, initial: initialLogs, formatValue: [] },
+  }), [setProjects, setRabData, setBqData, setPriceDatabase, setWorkItems, setUsers, setLogs, initialData]);
+
+  const handleSelectionChange = (key: string) => {
+    setSelectedData(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const getSelectedDataNames = () => Object.keys(selectedData).filter(key => selectedData[key]).map(key => dataMap[key as keyof typeof dataMap].name);
+  const isAnyDataSelected = Object.values(selectedData).some(v => v);
+
+  const openConfirmation = (type: 'format' | 'reset') => {
+    if (!isAnyDataSelected) {
+        toast.error('Pilih setidaknya satu jenis data.');
+        return;
+    }
+    setConfirmAction({ type });
+  };
+
+  const handleFormatSelected = () => {
+    const selectedNames = getSelectedDataNames();
+    Object.entries(selectedData).forEach(([key, isSelected]) => {
+        if (isSelected) {
+            const dataInfo = dataMap[key as keyof typeof dataMap];
+            dataInfo.setter(dataInfo.formatValue);
+        }
+    });
+    toast.success(`Data ${selectedNames.join(', ')} telah diformat.`);
+    setConfirmAction({ type: null });
+    setSelectedData(prev => Object.keys(prev).reduce((acc, key) => ({...acc, [key]: false}), {}));
+  };
+
+  const handleResetSelected = () => {
+    const selectedNames = getSelectedDataNames();
+    Object.entries(selectedData).forEach(([key, isSelected]) => {
+        if (isSelected) {
+            const dataInfo = dataMap[key as keyof typeof dataMap];
+            dataInfo.setter(dataInfo.initial);
+        }
+    });
+    toast.success(`Data ${selectedNames.join(', ')} telah direset.`);
+    setConfirmAction({ type: null });
+    setSelectedData(prev => Object.keys(prev).reduce((acc, key) => ({...acc, [key]: false}), {}));
+  };
   
   const handleExport = (data: any, filename: string, type: 'json' | 'xlsx') => {
     if (type === 'json') {
@@ -94,33 +152,29 @@ const AdminPage = () => {
   const handleResetData = () => {
     setProjects(initialData.initialProjects);
     setRabData(initialData.initialRabData);
+    setBqData(initialData.initialBqData);
     setPriceDatabase(initialData.initialPriceDatabase);
     setWorkItems(initialData.initialWorkItems);
+    setUsers(initialUsers);
+    setLogs(initialLogs);
     setIsResetConfirmOpen(false);
     toast.success('Semua data aplikasi berhasil direset ke pengaturan awal!');
-  };
-
-  const handleResetExceptDb = () => {
-    setProjects(initialData.initialProjects);
-    setRabData(initialData.initialRabData);
-    setIsResetExceptDbConfirmOpen(false);
-    toast.success('Data proyek dan RAB berhasil direset. Database tetap aman!');
   };
 
   const handleFormatData = () => {
     setProjects([]);
     setRabData([]);
+    setBqData([]);
     setPriceDatabase([]);
     setWorkItems([]);
+    setUsers(users => users.filter(u => u.role === 'Admin')); // Keep admin users
+    setLogs([]);
     setIsFormatConfirmOpen(false);
-    toast.success('Seluruh data aplikasi (proyek, RAB, database) telah dihapus!');
+    toast.success('Seluruh data aplikasi (proyek, RAB, BQ, database, log) telah dihapus! Pengguna non-admin dihapus.');
   };
   
   const handleExportDb = () => {
-      const combinedData = {
-          priceItems: priceDatabase,
-          workItems: workItems,
-      };
+      const combinedData = { priceItems: priceDatabase, workItems: workItems };
       handleExport(combinedData, 'database_data', 'json');
   }
 
@@ -137,7 +191,6 @@ const AdminPage = () => {
   const handleImportDb = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (e) => {
         try {
@@ -150,11 +203,8 @@ const AdminPage = () => {
             } else {
                 toast.error('File JSON tidak valid. Harus berisi objek dengan kunci "priceItems" dan "workItems".');
             }
-        } catch (error) {
-            toast.error('Gagal mem-parsing file JSON.');
-        } finally {
-            if (event.target) event.target.value = '';
-        }
+        } catch (error) { toast.error('Gagal mem-parsing file JSON.');
+        } finally { if (event.target) event.target.value = ''; }
     };
     reader.readAsText(file);
   };
@@ -166,23 +216,21 @@ const AdminPage = () => {
         onClose={() => setIsResetConfirmOpen(false)}
         onConfirm={handleResetData}
         title="Reset Seluruh Data Aplikasi"
-        message="Apakah Anda yakin? Semua data proyek, RAB, dan database akan dikembalikan ke data awal. Tindakan ini tidak dapat dibatalkan."
+        message="Apakah Anda yakin? Semua data akan dikembalikan ke data awal. Tindakan ini tidak dapat dibatalkan."
       />
-
        <ConfirmationModal 
         isOpen={isFormatConfirmOpen}
         onClose={() => setIsFormatConfirmOpen(false)}
         onConfirm={handleFormatData}
         title="Format Seluruh Data Aplikasi"
-        message="PERHATIAN! Tindakan ini akan MENGHAPUS SEMUA data proyek, RAB, dan database secara permanen. Data akan menjadi kosong. Apakah Anda benar-benar yakin?"
+        message="PERHATIAN! Tindakan ini akan MENGHAPUS SEMUA data (kecuali admin) secara permanen. Apakah Anda benar-benar yakin?"
       />
-
-      <ConfirmationModal 
-        isOpen={isResetExceptDbConfirmOpen}
-        onClose={() => setIsResetExceptDbConfirmOpen(false)}
-        onConfirm={handleResetExceptDb}
-        title="Reset Data (Kecuali Database)"
-        message="Anda yakin? Semua data Proyek dan RAB akan dikembalikan ke data awal. Data Database Harga dan Pekerjaan TIDAK akan terpengaruh. Tindakan ini tidak dapat dibatalkan."
+       <ConfirmationModal 
+        isOpen={confirmAction.type !== null}
+        onClose={() => setConfirmAction({ type: null })}
+        onConfirm={confirmAction.type === 'format' ? handleFormatSelected : handleResetSelected}
+        title={`${confirmAction.type === 'format' ? 'Format' : 'Reset'} Data Terpilih`}
+        message={`Anda yakin ingin ${confirmAction.type === 'format' ? 'menghapus' : 'mereset'} data berikut: ${getSelectedDataNames().join(', ')}? Tindakan ini tidak dapat dibatalkan.`}
       />
 
       <DataManagementCard 
@@ -191,12 +239,20 @@ const AdminPage = () => {
         onExportXlsx={() => handleExport(projects, 'projects_data', 'xlsx')}
         onImportJson={(e) => handleImport(e, setProjects, 'Proyek')}
       />
-      <DataManagementCard 
-        title="Data RAB"
-        onExportJson={() => handleExport(rabData, 'rab_data', 'json')}
-        onExportXlsx={() => handleExport(rabData.map(r => ({...r, detailItems: JSON.stringify(r.detailItems)})), 'rab_data', 'xlsx')}
-        onImportJson={(e) => handleImport(e, setRabData, 'RAB')}
-      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <DataManagementCard 
+          title="Data RAB"
+          onExportJson={() => handleExport(rabData, 'rab_data', 'json')}
+          onExportXlsx={() => handleExport(rabData.map(r => ({...r, detailItems: JSON.stringify(r.detailItems)})), 'rab_data', 'xlsx')}
+          onImportJson={(e) => handleImport(e, setRabData, 'RAB')}
+        />
+        <DataManagementCard 
+          title="Data BQ"
+          onExportJson={() => handleExport(bqData, 'bq_data', 'json')}
+          onExportXlsx={() => handleExport(bqData.map(r => ({...r, detailItems: JSON.stringify(r.detailItems)})), 'bq_data', 'xlsx')}
+          onImportJson={(e) => handleImport(e, setBqData, 'BQ')}
+        />
+      </div>
       <DataManagementCard 
         title="Database Harga & Pekerjaan"
         onExportJson={handleExportDb}
@@ -209,27 +265,45 @@ const AdminPage = () => {
           <AlertTriangle size={20} /> Danger Zone
         </h3>
         <p className="text-sm text-red-600 dark:text-red-300 mt-2 mb-4">
-          Tindakan berikut bersifat permanen dan dapat menyebabkan kehilangan data. Lanjutkan dengan hati-hati.
+          Tindakan di bawah bersifat permanen dan dapat menyebabkan kehilangan data. Lanjutkan dengan hati-hati.
         </p>
-        <div className="flex flex-wrap gap-3">
-             <button
-                onClick={() => setIsFormatConfirmOpen(true)}
-                className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-orange-500 border border-orange-600 rounded-lg hover:bg-orange-600 transition"
-                >
-                <Trash2 size={16} /> Format Data
-            </button>
-            <button
-                onClick={() => setIsResetExceptDbConfirmOpen(true)}
-                className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-yellow-500 border border-yellow-600 rounded-lg hover:bg-yellow-600 transition"
-            >
-                <RefreshCw size={16} /> Reset Kecuali Database
-            </button>
-            <button
-            onClick={() => setIsResetConfirmOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 border border-red-700 rounded-lg hover:bg-red-700 transition"
-            >
-            <RefreshCw size={16} /> Reset Semua Data Aplikasi
-            </button>
+
+        {/* Granular Actions */}
+        <div className="space-y-4">
+            <fieldset className="border border-red-300 dark:border-red-700 p-4 rounded-lg">
+                <legend className="px-2 font-semibold text-red-700 dark:text-red-200">Aksi Granular (Terpilih)</legend>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-6 gap-y-3 mt-2">
+                    {Object.entries(dataMap).map(([key, { name }]) => (
+                        <label key={key} className="flex items-center space-x-2 cursor-pointer text-sm text-red-900 dark:text-red-200">
+                            <input type="checkbox" checked={selectedData[key] || false} onChange={() => handleSelectionChange(key)} className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"/>
+                            <span>{name}</span>
+                        </label>
+                    ))}
+                </div>
+                <div className="flex flex-wrap gap-3 pt-4 mt-4 border-t border-red-200 dark:border-red-700">
+                    <button onClick={() => openConfirmation('format')} disabled={!isAnyDataSelected} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 border border-red-700 rounded-lg hover:bg-red-700 transition disabled:bg-red-400 disabled:cursor-not-allowed">
+                        <Trash2 size={16} /> Format Data Terpilih
+                    </button>
+                    <button onClick={() => openConfirmation('reset')} disabled={!isAnyDataSelected} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-yellow-900 bg-yellow-400 border border-yellow-500 rounded-lg hover:bg-yellow-500 transition disabled:bg-yellow-300 disabled:cursor-not-allowed">
+                        <RefreshCw size={16} /> Reset Data Terpilih
+                    </button>
+                </div>
+            </fieldset>
+        </div>
+
+        <div className="my-6 border-t-2 border-dashed border-red-300 dark:border-red-600"></div>
+
+        {/* Global Actions */}
+        <div>
+            <h4 className="text-md font-semibold text-red-700 dark:text-red-200">Aksi Global (Mempengaruhi SEMUA Data)</h4>
+            <div className="flex flex-wrap gap-3 mt-3">
+                <button onClick={() => setIsFormatConfirmOpen(true)} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-orange-500 border border-orange-600 rounded-lg hover:bg-orange-600 transition">
+                    <Trash2 size={16} /> Format Semua Data
+                </button>
+                <button onClick={() => setIsResetConfirmOpen(true)} className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 border border-red-700 rounded-lg hover:bg-red-700 transition">
+                    <RefreshCw size={16} /> Reset Semua Data Aplikasi
+                </button>
+            </div>
         </div>
       </div>
     </div>

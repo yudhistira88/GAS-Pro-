@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useContext, useEffect, useCallback, useRef } from 'react';
 import { type Project, type ProjectPhase } from '../../types';
 import { ThemeContext } from '../../contexts/ThemeContext';
-import { Calendar, ChevronDown, Download, Maximize, TrendingUp, DollarSign, Clock, ShieldAlert, BarChart, LineChart as LineChartIcon, Camera, AlertTriangle, PlusCircle, X as XIcon, Trash2, Plus, Save, Edit, RefreshCw, Check, Settings, Upload, FileText, Search, DownloadCloud, MoreVertical, Pencil, KeyRound, Trophy } from 'lucide-react';
+import { Calendar, ChevronDown, Download, Maximize, TrendingUp, DollarSign, Clock, ShieldAlert, BarChart, Camera, PlusCircle, X as XIcon, Trash2, Plus, Save, Edit, RefreshCw, Check, Settings, Upload, FileText, DownloadCloud, MoreVertical, Pencil, KeyRound, Trophy } from 'lucide-react';
 import {
     ResponsiveContainer,
     LineChart as RechartsLineChart, Line,
-    XAxis, YAxis, CartesianGrid, Tooltip, Legend, ScatterChart, Scatter, Cell
+    XAxis, YAxis, CartesianGrid, Tooltip, Legend
 } from 'recharts';
 import toast from 'react-hot-toast';
 import jsPDF from 'jspdf';
@@ -52,7 +52,6 @@ interface ScheduleWormItem {
   phase: string;
   status: 'complete' | 'inProgress' | 'notStarted';
   icon?: 'key' | 'trophy' | 'payment' | 'refresh';
-  indicator?: { number: number; color: 'red' | 'green' };
 }
 
 
@@ -80,18 +79,18 @@ const initialGalleryImages: GalleryItem[] = [
 ];
 
 const initialScheduleWormData: ScheduleWormItem[] = [
-    { id: 'sw-1', name: "Project Charter", subLabel: "Approved", date: "2024-01-31", phase: "Initiation", status: "complete", icon: 'key', indicator: { number: 1, color: 'red' } },
+    { id: 'sw-1', name: "Project Charter", subLabel: "Approved", date: "2024-01-31", phase: "Initiation", status: "complete", icon: 'key' },
     { id: 'sw-2', name: "Permits & Approvals", subLabel: "", date: "2024-05-29", phase: "Planning", status: "complete" },
     { id: 'sw-3', name: "Concept Design", subLabel: "Complete", date: "2024-06-28", phase: "Design", status: "complete", icon: 'key' },
     { id: 'sw-4', name: "Detailed Design", subLabel: "Complete", date: "2024-07-25", phase: "Design", status: "complete", icon: 'key' },
-    { id: 'sw-5', name: "Construction Documentation", subLabel: "Complete", date: "2024-09-29", phase: "Design", status: "complete", icon: 'key', indicator: { number: 3, color: 'red' } },
+    { id: 'sw-5', name: "Construction Documentation", subLabel: "Complete", date: "2024-09-29", phase: "Design", status: "complete", icon: 'key' },
     { id: 'sw-6', name: "Tender Period", subLabel: "Complete", date: "2024-10-26", phase: "Procurement", status: "complete" },
-    { id: 'sw-7', name: "Contract Award", date: "2024-11-30", phase: "Procurement", status: "complete", icon: 'trophy', indicator: { number: 5, color: 'red' } },
+    { id: 'sw-7', name: "Contract Award", date: "2024-11-30", phase: "Procurement", status: "complete", icon: 'trophy' },
     { id: 'sw-8', name: "Site Mobilization", date: "2024-12-20", phase: "Delivery", status: "complete", icon: 'key' },
     { id: 'sw-9', name: "Construction Commencement", date: "2025-01-24", phase: "Delivery", status: "complete" },
     { id: 'sw-10', name: "Early Works", subLabel: "Complete", date: "2025-02-23", phase: "Delivery", status: "complete", icon: 'key' },
-    { id: 'sw-11', name: "Main Works", subLabel: "Complete", date: "2026-03-20", phase: "Delivery", status: "inProgress", icon: 'refresh', indicator: { number: 5, color: 'green' } },
-    { id: 'sw-12', name: "Practical Completion / Substantial...", date: "2026-05-26", phase: "Delivery", status: "notStarted", icon: 'key', indicator: { number: 2, color: 'red' } },
+    { id: 'sw-11', name: "Main Works", subLabel: "Complete", date: "2026-03-20", phase: "Delivery", status: "inProgress", icon: 'refresh' },
+    { id: 'sw-12', name: "Practical Completion / Substantial...", date: "2026-05-26", phase: "Delivery", status: "notStarted", icon: 'key' },
     { id: 'sw-13', name: "Punch List / Defects List", subLabel: "Complete", date: "2026-06-23", phase: "Close", status: "notStarted" },
     { id: 'sw-14', name: "Final Payment", date: "2026-08-22", phase: "Close", status: "notStarted", icon: 'payment' },
     { id: 'sw-15', name: "Project Closure", date: "2026-10-21", phase: "Close", status: "notStarted", icon: 'key' },
@@ -102,7 +101,6 @@ const allComponentDetails = {
     stats: { name: 'Statistik Utama' },
     timeline: { name: 'Fase & Linimasa Proyek' },
     milestones: { name: 'Milestone & Jadwal' },
-    progressChart: { name: 'Grafik Progres Mingguan' },
     weeklyReports: { name: 'Laporan Mingguan' },
     risks: { name: 'Kendala & Risiko' },
     gallery: { name: 'Dokumentasi Lapangan' },
@@ -110,17 +108,17 @@ const allComponentDetails = {
 
 // --- REUSABLE COMPONENTS ---
 const ReportStatCard = ({ icon, title, value, target, colorClass }: { icon: React.ReactNode, title: string, value: string, target: string, colorClass: string }) => (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-md border-l-4" style={{ borderColor: colorClass }}>
-        <div className="flex items-center justify-between"> <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p> {icon} </div>
-        <p className="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-2">{value}</p>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{target}</p>
+    <div className="bg-card p-4 rounded-xl shadow-md border-l-4" style={{ borderColor: colorClass }}>
+        <div className="flex items-center justify-between"> <p className="text-sm font-medium text-muted-foreground">{title}</p> {icon} </div>
+        <p className="text-3xl font-bold text-card-foreground mt-2">{value}</p>
+        <p className="text-xs text-muted-foreground mt-1">{target}</p>
     </div>
 );
 
 const ChartContainer = ({ title, children, icon, headerActions }: { title: string, children: React.ReactNode, icon: React.ReactNode, headerActions?: React.ReactNode }) => (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+    <div className="bg-card p-6 rounded-xl shadow-md">
         <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">{icon}{title}</h3>
+            <h3 className="text-lg font-bold text-card-foreground flex items-center gap-2">{icon}{title}</h3>
              {headerActions && <div className="flex items-center gap-2">{headerActions}</div>}
         </div>
         {children}
@@ -140,7 +138,7 @@ const PriorityBadge = ({ priority }: { priority: Risk['priority'] }) => {
     );
 };
 
-const inputClasses = "w-full p-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-honda-red focus:border-transparent transition bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-200";
+const inputClasses = "w-full p-2 text-sm border border-input rounded-md focus:ring-2 focus:ring-primary focus:border-transparent transition bg-background text-foreground";
 
 const recalculateCumulativeProgress = (reports: WeeklyReport[]): WeeklyReport[] => {
     const sortedReports = [...reports].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
@@ -178,18 +176,18 @@ const WeeklyReportActionMenu = ({ onEdit, onUpload, onDelete }: { onEdit: () => 
 
     return (
         <div className="relative" ref={menuRef}>
-            <button onClick={() => setIsOpen(p => !p)} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600">
+            <button onClick={() => setIsOpen(p => !p)} className="p-2 rounded-full hover:bg-muted">
                 <MoreVertical size={18} />
             </button>
             {isOpen && (
-                <div className="absolute right-0 mt-1 w-48 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-10 animate-fade-in-up-fast">
-                    <button onClick={createClickHandler(onEdit)} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                <div className="absolute right-0 mt-1 w-48 bg-card border rounded-lg shadow-xl z-10 animate-fade-in-up-fast">
+                    <button onClick={createClickHandler(onEdit)} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-card-foreground hover:bg-muted">
                         <Edit size={16} /> Edit Laporan
                     </button>
-                    <button onClick={createClickHandler(onUpload)} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <button onClick={createClickHandler(onUpload)} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-card-foreground hover:bg-muted">
                         <Upload size={16} /> Upload Lampiran
                     </button>
-                    <button onClick={createClickHandler(onDelete)} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <button onClick={createClickHandler(onDelete)} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-muted">
                         <Trash2 size={16} /> Hapus
                     </button>
                 </div>
@@ -228,13 +226,6 @@ const handleScreenshot = async (elementRef: React.RefObject<HTMLElement>, filena
 
 // --- MILESTONE TIMELINE COMPONENT ---
 const MilestoneNode = ({ item, isLast }: { item: ScheduleWormItem, isLast: boolean }) => {
-    const icons = {
-        key: <KeyRound size={16} className="text-white" />,
-        trophy: <Trophy size={16} className="text-white" />,
-        payment: <DollarSign size={16} className="text-white" />,
-        refresh: <RefreshCw size={16} className="text-blue-600" />,
-    };
-
     let nodeClasses = "w-10 h-10 flex items-center justify-center rounded-lg relative shadow-md";
     let nodeContent = null;
     
@@ -245,26 +236,8 @@ const MilestoneNode = ({ item, isLast }: { item: ScheduleWormItem, isLast: boole
         nodeClasses += " bg-blue-600";
         nodeContent = <RefreshCw size={20} className="text-white" />;
     } else {
-        nodeClasses += " border-2 border-sky-400 bg-white dark:bg-gray-800";
+        nodeClasses += " border-2 border-sky-400 bg-card";
     }
-
-    const iconBadge = item.icon ? (
-        <div className={`absolute -top-2.5 -right-2.5 w-7 h-7 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800 shadow-sm ${
-            item.icon === 'trophy' ? 'bg-yellow-400' : 
-            item.icon === 'payment' ? 'bg-green-500' :
-            'bg-indigo-500'
-        }`}>
-            {icons[item.icon]}
-        </div>
-    ) : null;
-    
-    const numberIndicator = item.indicator ? (
-        <div className={`absolute -bottom-2.5 -left-2.5 w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold border-2 border-white dark:border-gray-800 shadow-sm ${
-            item.indicator.color === 'red' ? 'bg-red-500' : 'bg-green-500'
-        }`}>
-            {item.indicator.number}
-        </div>
-    ) : null;
 
     const connectorLine = !isLast ? (
         <div className="absolute left-full top-1/2 w-24 h-0.5 bg-sky-400"></div>
@@ -273,23 +246,59 @@ const MilestoneNode = ({ item, isLast }: { item: ScheduleWormItem, isLast: boole
     return (
         <div className="relative flex-shrink-0 w-32 flex flex-col items-center">
             <div className="text-center h-14 mb-2 flex flex-col justify-end">
-                <p className="text-xs font-bold text-gray-700 dark:text-gray-200 leading-tight">{item.name}</p>
-                {item.subLabel && <p className="text-xs text-gray-500 dark:text-gray-400">{item.subLabel}</p>}
+                <p className="text-xs font-bold text-card-foreground leading-tight">{item.name}</p>
+                {item.subLabel && <p className="text-xs text-muted-foreground">{item.subLabel}</p>}
             </div>
             
             <div className="relative">
                 <div className={nodeClasses}>
                     {nodeContent}
-                    {iconBadge}
                 </div>
                 {connectorLine}
             </div>
             
              <div className="text-center mt-2 h-10">
-                <p className="text-xs text-gray-600 dark:text-gray-400">{new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                <p className="text-xs text-muted-foreground">{new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                 <p className="text-xs font-semibold text-sky-600 dark:text-sky-400 mt-1">{item.phase}</p>
              </div>
-             {numberIndicator}
+        </div>
+    );
+};
+
+const MilestoneActionMenu = ({ onEdit, onDelete }: { onEdit: () => void, onDelete: () => void }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const createClickHandler = (action: () => void) => () => {
+        action();
+        setIsOpen(false);
+    };
+
+    return (
+        <div className="relative" ref={menuRef}>
+            <button onClick={() => setIsOpen(p => !p)} className="p-2 rounded-full hover:bg-muted">
+                <MoreVertical size={18} />
+            </button>
+            {isOpen && (
+                <div className="absolute right-0 mt-1 w-48 bg-card border rounded-lg shadow-xl z-10 animate-fade-in-up-fast">
+                    <button onClick={createClickHandler(onEdit)} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-card-foreground hover:bg-muted">
+                        <Pencil size={16} /> Edit Milestone
+                    </button>
+                    <button onClick={createClickHandler(onDelete)} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-muted">
+                        <Trash2 size={16} /> Hapus Milestone
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
@@ -307,7 +316,6 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
     const statsRef = useRef<HTMLDivElement>(null);
     const timelineRef = useRef<HTMLDivElement>(null);
     const milestonesRef = useRef<HTMLDivElement>(null);
-    const progressChartRef = useRef<HTMLDivElement>(null);
     const weeklyReportsRef = useRef<HTMLDivElement>(null);
     const risksRef = useRef<HTMLDivElement>(null);
     const risksTableRef = useRef<HTMLTableElement>(null);
@@ -475,22 +483,6 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
         setHasChanges(false);
         toast.success('Perubahan fase proyek berhasil disimpan!');
     };
-    
-    const themeStyles = useMemo(() => ({
-        tickColor: theme === 'dark' ? '#9CA3AF' : '#6B7280',
-        gridStrokeColor: theme === 'dark' ? '#374151' : '#E5E7EB',
-        tooltipBackgroundColor: theme === 'dark' ? '#1F2937' : '#FFFFFF',
-    }), [theme]);
-
-    const commonChartProps = useMemo(() => ({
-        contentStyle: { 
-            backgroundColor: themeStyles.tooltipBackgroundColor, 
-            border: `1px solid ${themeStyles.gridStrokeColor}`, 
-            borderRadius: '0.5rem', 
-            fontSize: '12px' 
-        }, 
-        axisTick: { fill: themeStyles.tickColor, fontSize: 12 }
-    }), [themeStyles]);
     
     const allDates = useMemo(() => {
         return localPhases.flatMap(p => [
@@ -974,6 +966,17 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
     const phaseOptions = useMemo(() => localPhases.map(p => p.name), [localPhases]);
 
      // --- DYNAMIC STATISTICS ---
+    const { daysRemaining, isOverdue } = useMemo(() => {
+        if (!project) return { daysRemaining: 0, isOverdue: false };
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dueDate = new Date(project.dueDate);
+        dueDate.setHours(0, 0, 0, 0);
+        const diffTime = dueDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return { daysRemaining: diffDays, isOverdue: diffDays < 0 };
+    }, [project]);
+    
     const timeVariance = useMemo(() => {
         if (!project?.phases) return { value: 'N/A', target: 'Data fase tidak ada', colorClass: '#64748B' };
         const completedPhases = localPhases.filter(p => p.actual.end && p.plan.end);
@@ -992,16 +995,7 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
         return { value: 'Tepat Waktu', target: 'Sesuai jadwal', colorClass: '#22C55E' };
     }, [localPhases, project]);
 
-    const riskLevel = useMemo(() => {
-        const activeRisks = risks.filter(r => r.status !== 'Selesai');
-        const highPriorityCount = activeRisks.filter(r => r.priority === 'High').length;
-        if (highPriorityCount > 0) return { text: 'High', target: `${highPriorityCount} Isu Prioritas Tinggi`, colorClass: '#EF4444' };
-        
-        const mediumPriorityCount = activeRisks.filter(r => r.priority === 'Medium').length;
-        if (mediumPriorityCount > 0) return { text: 'Medium', target: `${mediumPriorityCount} Isu Prioritas Sedang`, colorClass: '#F59E0B' };
-        
-        return { text: 'Low', target: `${activeRisks.length} Isu Aktif`, colorClass: '#22C55E' };
-    }, [risks]);
+    const activeRisksCount = useMemo(() => risks.filter(r => r.status !== 'Selesai').length, [risks]);
     
     if (!project) return null;
 
@@ -1012,7 +1006,6 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
         { id: 'stats', ref: statsRef, name: 'Statistik Utama' },
         { id: 'timeline', ref: timelineRef, name: 'Fase & Linimasa Proyek' },
         { id: 'milestones', ref: milestonesRef, name: 'Milestone & Jadwal' },
-        { id: 'progressChart', ref: progressChartRef, name: 'Grafik Progres Mingguan' },
         { id: 'weeklyReports', ref: weeklyReportsRef, name: 'Laporan Mingguan' },
         { id: 'risks', ref: risksRef, name: 'Kendala & Risiko' },
         { id: 'gallery', ref: galleryRef, name: 'Dokumentasi Lapangan' },
@@ -1099,25 +1092,25 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
         header: {
             id: 'header',
             component: (
-                 <div className="bg-white dark:bg-gray-800 p-4 rounded-xl shadow-md flex flex-wrap justify-between items-center gap-4">
-                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Laporan Proyek: {project.name}</h2>
+                 <div className="bg-card p-4 rounded-xl shadow-md flex flex-wrap justify-between items-center gap-4">
+                    <h2 className="text-xl font-bold text-card-foreground">Laporan Proyek: {project.name}</h2>
                     <div className="flex items-center gap-2">
                         <div className="relative" ref={settingsRef}>
-                            <button onClick={() => setIsSettingsOpen(p => !p)} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600 transition">
+                            <button onClick={() => setIsSettingsOpen(p => !p)} className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground bg-background border border-input rounded-lg hover:bg-muted">
                                 <Settings size={16} />
                                 <span>Kelola Tampilan</span>
                             </button>
                             {isSettingsOpen && (
-                                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-20 p-4 animate-fade-in-up-fast">
-                                    <h4 className="text-sm font-semibold mb-3 text-gray-800 dark:text-gray-100">Tampilkan/Sembunyikan Kartu</h4>
+                                <div className="absolute right-0 mt-2 w-64 bg-card border rounded-lg shadow-xl z-20 p-4 animate-fade-in-up-fast">
+                                    <h4 className="text-sm font-semibold mb-3 text-card-foreground">Tampilkan/Sembunyikan Kartu</h4>
                                     <div className="space-y-2">
                                         {Object.entries(allComponentDetails).map(([key, { name }]) => (
-                                            <label key={key} className="flex items-center text-sm space-x-2 cursor-pointer text-gray-700 dark:text-gray-300">
+                                            <label key={key} className="flex items-center text-sm space-x-2 cursor-pointer text-muted-foreground">
                                                 <input
                                                     type="checkbox"
                                                     checked={!!visibility[key]}
                                                     onChange={(e) => handleVisibilityChange(key, e.target.checked)}
-                                                    className="h-4 w-4 rounded border-gray-300 text-honda-red focus:ring-honda-red dark:bg-gray-700 dark:border-gray-600"
+                                                    className="h-4 w-4 rounded border-input text-primary focus:ring-primary"
                                                 />
                                                 <span>{name}</span>
                                             </label>
@@ -1127,13 +1120,13 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                             )}
                         </div>
                         <div className="relative" ref={mainExportMenuRef}>
-                            <button onClick={() => setIsMainExportMenuOpen(p => !p)} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-white bg-honda-red rounded-lg hover:bg-red-700 transition shadow">
+                            <button onClick={() => setIsMainExportMenuOpen(p => !p)} className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-primary-foreground bg-primary rounded-lg hover:bg-primary/90 transition shadow">
                                 <Download size={16} /> Export Laporan <ChevronDown size={16} />
                             </button>
                              {isMainExportMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-10 animate-fade-in-up-fast">
-                                    <button onClick={handleExportFullPdf} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Export ke PDF</button>
-                                    <button onClick={handleExportFullXlsx} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Export ke Excel</button>
+                                <div className="absolute right-0 mt-2 w-48 bg-card border rounded-lg shadow-xl z-10 animate-fade-in-up-fast">
+                                    <button onClick={handleExportFullPdf} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-card-foreground hover:bg-muted">Export ke PDF</button>
+                                    <button onClick={handleExportFullXlsx} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-card-foreground hover:bg-muted">Export ke Excel</button>
                                 </div>
                             )}
                         </div>
@@ -1144,22 +1137,21 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
         stats: {
             id: 'stats',
             component: (
-                <div ref={statsRef} className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+                <div ref={statsRef} className="bg-card p-6 rounded-xl shadow-md">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-card-foreground flex items-center gap-2">
                             <BarChart size={20} />
                             Statistik Utama
                         </h3>
-                        <button onClick={() => handleScreenshot(statsRef, 'statistik_utama.png')} className="p-1.5 text-gray-500 hover:text-blue-500 dark:hover:text-blue-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" title="Ambil Screenshot">
+                        <button onClick={() => handleScreenshot(statsRef, 'statistik_utama.png')} className="p-1.5 text-muted-foreground hover:text-primary rounded-full hover:bg-muted" title="Ambil Screenshot">
                             <Camera size={16} />
                         </button>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-                        <ReportStatCard icon={<TrendingUp size={20} className="text-gray-400" />} title="Progress Fisik" value={`${project.progress}%`} target={`vs ${weeklyReports.length > 0 ? weeklyReports[weeklyReports.length - 1].planProgressCumulative.toFixed(0) : '0'}% Target`} colorClass="#3B82F6" />
-                        <ReportStatCard icon={<DollarSign size={20} className="text-gray-400" />} title="Progress Keuangan" value={`${project.progress}%`} target="vs Rencana Keuangan" colorClass="#10B981" />
-                        <ReportStatCard icon={<Clock size={20} className="text-gray-400" />} title="Variance Waktu" value={timeVariance.value} target={timeVariance.target} colorClass={timeVariance.colorClass} />
-                        <ReportStatCard icon={<DollarSign size={20} className="text-gray-400" />} title="Variance Biaya" value="N/A" target="Data belum tersedia" colorClass="#64748B" />
-                        <ReportStatCard icon={<ShieldAlert size={20} className="text-gray-400" />} title="Risk Level" value={riskLevel.text} target={riskLevel.target} colorClass={riskLevel.colorClass} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <ReportStatCard icon={<TrendingUp size={20} className="text-muted-foreground" />} title="Progress Fisik" value={`${project.progress}%`} target={`vs ${weeklyReports.length > 0 ? weeklyReports[weeklyReports.length - 1].planProgressCumulative.toFixed(0) : '0'}% Target`} colorClass="#3B82F6" />
+                        <ReportStatCard icon={<Clock size={20} className="text-muted-foreground" />} title="Sisa Waktu" value={isOverdue ? `${Math.abs(daysRemaining)} Hari` : `${daysRemaining} Hari`} target={isOverdue ? 'Terlambat' : 'Menuju tenggat'} colorClass={isOverdue ? '#EF4444' : '#F59E0B'} />
+                        <ReportStatCard icon={<Clock size={20} className="text-muted-foreground" />} title="Variance Waktu" value={timeVariance.value} target={timeVariance.target} colorClass={timeVariance.colorClass} />
+                        <ReportStatCard icon={<ShieldAlert size={20} className="text-muted-foreground" />} title="Risiko Aktif" value={activeRisksCount.toString()} target="Isu perlu ditangani" colorClass={activeRisksCount > 0 ? '#EF4444' : '#22C55E'} />
                     </div>
                 </div>
             )
@@ -1167,18 +1159,18 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
         timeline: {
             id: 'timeline',
             component: (
-                <div ref={timelineRef} className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
+                <div ref={timelineRef} className="bg-card p-6 rounded-xl shadow-md">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-lg text-gray-800 dark:text-gray-100">Project Phases & Timeline</h3>
+                        <h3 className="font-bold text-lg text-card-foreground">Fase & Linimasa Proyek</h3>
                         <div className="flex items-center gap-2">
-                            <button onClick={() => setIsPhasesTableVisible(p => !p)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition">
+                            <button onClick={() => setIsPhasesTableVisible(p => !p)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground bg-muted rounded-md hover:bg-muted/80 transition">
                                 {isPhasesTableVisible ? 'Sembunyikan' : 'Tampilkan'} Tabel
                                 <ChevronDown size={14} className={`transition-transform ${isPhasesTableVisible ? 'rotate-180' : ''}`} />
                             </button>
-                             <button onClick={() => handleScreenshot(timelineRef, 'timeline_proyek.png')} className="p-1.5 text-gray-500 hover:text-blue-500 dark:hover:text-blue-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" title="Ambil Screenshot">
+                             <button onClick={() => handleScreenshot(timelineRef, 'timeline_proyek.png')} className="p-1.5 text-muted-foreground hover:text-primary rounded-full hover:bg-muted" title="Ambil Screenshot">
                                 <Camera size={16} />
                             </button>
-                            <button onClick={handleAddPhase} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-honda-red rounded-md hover:bg-red-700 transition shadow">
+                            <button onClick={handleAddPhase} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition shadow">
                                 <Plus size={14} /> Tambah Fase
                             </button>
                             {hasChanges && (
@@ -1191,20 +1183,20 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                     <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isPhasesTableVisible ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}>
                         <div className="overflow-x-auto mb-6">
                             <table className="w-full text-sm">
-                                <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50">
+                                <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
                                     <tr>
                                         <th className="px-2 py-2 w-1/4">Nama Fase</th><th className="px-2 py-2">Mulai Rencana</th><th className="px-2 py-2">Selesai Rencana</th><th className="px-2 py-2">Mulai Aktual</th><th className="px-2 py-2">Selesai Aktual</th><th className="px-2 py-2 w-16">Aksi</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {localPhases.map(phase => (
-                                        <tr key={phase.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/20">
-                                            <td className="px-2 py-1"><input type="text" value={phase.name} onChange={e => handlePhaseChange(phase.id, 'name', e.target.value)} className="w-full bg-transparent p-1 rounded-md focus:bg-white dark:focus:bg-gray-700 focus:ring-1 focus:ring-honda-red outline-none"/></td>
-                                            <td className="px-2 py-1"><input type="date" value={phase.plan.start || ''} onChange={e => handlePhaseChange(phase.id, 'plan', e.target.value, 'start')} className="w-full bg-transparent p-1 rounded-md focus:bg-white dark:focus:bg-gray-700 focus:ring-1 focus:ring-honda-red outline-none"/></td>
-                                            <td className="px-2 py-1"><input type="date" value={phase.plan.end || ''} onChange={e => handlePhaseChange(phase.id, 'plan', e.target.value, 'end')} className="w-full bg-transparent p-1 rounded-md focus:bg-white dark:focus:bg-gray-700 focus:ring-1 focus:ring-honda-red outline-none"/></td>
-                                            <td className="px-2 py-1"><input type="date" value={phase.actual.start || ''} onChange={e => handlePhaseChange(phase.id, 'actual', e.target.value, 'start')} className="w-full bg-transparent p-1 rounded-md focus:bg-white dark:focus:bg-gray-700 focus:ring-1 focus:ring-honda-red outline-none"/></td>
-                                            <td className="px-2 py-1"><input type="date" value={phase.actual.end || ''} onChange={e => handlePhaseChange(phase.id, 'actual', e.target.value, 'end')} className="w-full bg-transparent p-1 rounded-md focus:bg-white dark:focus:bg-gray-700 focus:ring-1 focus:ring-honda-red outline-none"/></td>
-                                            <td className="px-2 py-1 text-center"><button onClick={() => handleDeletePhase(phase.id)} className="p-1 text-gray-400 hover:text-red-500 rounded-full"><Trash2 size={14}/></button></td>
+                                        <tr key={phase.id} className="border-b border-border hover:bg-muted/30">
+                                            <td className="px-2 py-1"><input type="text" value={phase.name} onChange={e => handlePhaseChange(phase.id, 'name', e.target.value)} className="w-full bg-transparent p-1 rounded-md focus:bg-background focus:ring-1 focus:ring-primary outline-none"/></td>
+                                            <td className="px-2 py-1"><input type="date" value={phase.plan.start || ''} onChange={e => handlePhaseChange(phase.id, 'plan', e.target.value, 'start')} className="w-full bg-transparent p-1 rounded-md focus:bg-background focus:ring-1 focus:ring-primary outline-none"/></td>
+                                            <td className="px-2 py-1"><input type="date" value={phase.plan.end || ''} onChange={e => handlePhaseChange(phase.id, 'plan', e.target.value, 'end')} className="w-full bg-transparent p-1 rounded-md focus:bg-background focus:ring-1 focus:ring-primary outline-none"/></td>
+                                            <td className="px-2 py-1"><input type="date" value={phase.actual.start || ''} onChange={e => handlePhaseChange(phase.id, 'actual', e.target.value, 'start')} className="w-full bg-transparent p-1 rounded-md focus:bg-background focus:ring-1 focus:ring-primary outline-none"/></td>
+                                            <td className="px-2 py-1"><input type="date" value={phase.actual.end || ''} onChange={e => handlePhaseChange(phase.id, 'actual', e.target.value, 'end')} className="w-full bg-transparent p-1 rounded-md focus:bg-background focus:ring-1 focus:ring-primary outline-none"/></td>
+                                            <td className="px-2 py-1 text-center"><button onClick={() => handleDeletePhase(phase.id)} className="p-1 text-muted-foreground hover:text-destructive rounded-full"><Trash2 size={14}/></button></td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -1217,8 +1209,8 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                                 <div className="absolute w-full h-[calc(100%-5rem)] top-8">
                                     {monthMarkers.map(marker => (
                                         <div key={marker.label} className="absolute h-full" style={{ left: `${marker.position}%`}}>
-                                            <div className="w-px h-full bg-gray-200 dark:bg-gray-700/50"></div>
-                                            <span className="absolute top-full mt-1 transform -translate-x-1/2 text-[10px] text-gray-400 dark:text-gray-500">
+                                            <div className="w-px h-full bg-border"></div>
+                                            <span className="absolute top-full mt-1 transform -translate-x-1/2 text-[10px] text-muted-foreground">
                                                 {marker.label}
                                             </span>
                                         </div>
@@ -1227,7 +1219,7 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
 
                                 <div className="absolute w-full top-10 space-y-3">
                                     <div className="flex items-center gap-4">
-                                        <div className="w-12 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 shrink-0">Plan</div>
+                                        <div className="w-12 text-right text-xs font-semibold text-muted-foreground shrink-0">Plan</div>
                                         <div className="relative h-6 flex-1">
                                             {localPhases.map(phase => {
                                                 if (!phase.plan.start || !phase.plan.end) return null;
@@ -1246,7 +1238,7 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-4">
-                                        <div className="w-12 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 shrink-0">Actual</div>
+                                        <div className="w-12 text-right text-xs font-semibold text-muted-foreground shrink-0">Actual</div>
                                         <div className="relative h-6 flex-1">
                                             {localPhases.map(phase => {
                                                 if (!phase.actual.start) return null;
@@ -1274,7 +1266,7 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                                     </div>
                                 )}
                             </>
-                        ) : <p className="text-center text-gray-500 text-sm py-4">Data fase tidak tersedia.</p>}
+                        ) : <p className="text-center text-muted-foreground text-sm py-4">Data fase tidak tersedia.</p>}
                     </div>
                 </div>
             )
@@ -1284,32 +1276,32 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
             component: (
                 <div ref={milestonesRef}>
                     <ChartContainer 
-                        title="Milestone & Schedule Worm" 
+                        title="Milestone & Jadwal" 
                         icon={<Calendar size={20}/>} 
                         headerActions={
                             <>
                                 <select
                                     value={milestonePhaseFilter}
                                     onChange={e => setMilestonePhaseFilter(e.target.value)}
-                                    className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition border-none focus:ring-1 focus:ring-honda-red"
+                                    className="px-3 py-1.5 text-xs font-medium text-foreground bg-muted rounded-md hover:bg-muted/80 transition border-none focus:ring-1 focus:ring-primary"
                                 >
                                     <option value="all">Semua Fase</option>
                                     {phaseOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                 </select>
-                                <button onClick={() => setIsWormTableVisible(p => !p)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition">
+                                <button onClick={() => setIsWormTableVisible(p => !p)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground bg-muted rounded-md hover:bg-muted/80 transition">
                                     {isWormTableVisible ? 'Sembunyikan' : 'Tampilkan'} Tabel
                                     <ChevronDown size={14} className={`transition-transform ${isWormTableVisible ? 'rotate-180' : ''}`} />
                                 </button>
-                                <button onClick={() => handleScreenshot(milestonesRef, 'milestones.png')} className="p-1.5 text-gray-500 hover:text-blue-500 dark:hover:text-blue-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" title="Ambil Screenshot">
+                                <button onClick={() => handleScreenshot(milestonesRef, 'milestones.png')} className="p-1.5 text-muted-foreground hover:text-primary rounded-full hover:bg-muted" title="Ambil Screenshot">
                                     <Camera size={16} />
                                 </button>
-                                <button onClick={toggleWormForm} className={`flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white rounded-md hover:bg-red-700 transition shadow ${showWormForm ? 'bg-gray-500 hover:bg-gray-600' : 'bg-honda-red'}`}>
+                                <button onClick={toggleWormForm} className={`flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white rounded-md hover:bg-red-700 transition shadow ${showWormForm ? 'bg-gray-500 hover:bg-gray-600' : 'bg-primary'}`}>
                                     {showWormForm ? <XIcon size={14} /> : <Plus size={14} />} {showWormForm ? 'Batal' : 'Tambah'}
                                 </button>
                             </>
                         }
                     >
-                        <div className="w-full overflow-x-auto overflow-y-hidden py-10 border-y dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 -mx-6 px-6">
+                        <div className="w-full overflow-x-auto overflow-y-hidden py-10 border-y border-border bg-muted/30 -mx-6 px-6">
                             <div className="inline-flex items-start px-4 min-w-full">
                                 {sortedWorms.map((worm, index) => (
                                     <MilestoneNode key={worm.id} item={worm} isLast={index === sortedWorms.length - 1} />
@@ -1318,7 +1310,7 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                         </div>
 
                         {showWormForm && (
-                            <form onSubmit={handleWormFormSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg animate-fade-in-up-fast">
+                            <form onSubmit={handleWormFormSubmit} className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 p-4 bg-muted/50 rounded-lg animate-fade-in-up-fast">
                                 <div className="md:col-span-2"><input type="text" placeholder="Nama Milestone" value={wormForm.name} onChange={e => setWormForm({...wormForm, name: e.target.value})} className={inputClasses} /></div>
                                 <div><input type="date" value={wormForm.date} onChange={e => setWormForm({...wormForm, date: e.target.value})} className={inputClasses} /></div>
                                 <div><select value={wormForm.phase} onChange={e => setWormForm({...wormForm, phase: e.target.value})} className={inputClasses}>{phaseOptions.map(p => <option key={p} value={p}>{p}</option>)}</select></div>
@@ -1328,21 +1320,20 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                         <div className={`transition-all duration-500 ease-in-out overflow-hidden ${isWormTableVisible ? 'max-h-[1000px] opacity-100 mt-4' : 'max-h-0 opacity-0'}`}>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm text-left">
-                                    <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50">
+                                    <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
                                         <tr>
                                             <th className="px-4 py-2">Milestone</th><th className="px-4 py-2">Fase</th><th className="px-4 py-2">Tanggal</th><th className="px-4 py-2 text-center">Status</th><th className="px-4 py-2 text-center">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {sortedWorms.map(worm => (
-                                            <tr key={worm.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/20">
+                                            <tr key={worm.id} className="border-b border-border hover:bg-muted/30">
                                                 <td className="px-4 py-2 font-medium">{worm.name}</td>
                                                 <td className="px-4 py-2">{worm.phase}</td>
                                                 <td className="px-4 py-2">{new Date(worm.date).toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'})}</td>
                                                 <td className="px-4 py-2 text-center"><span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${worm.status === 'complete' ? 'bg-green-100 text-green-800' : worm.status === 'inProgress' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{worm.status}</span></td>
                                                 <td className="px-4 py-2 text-center">
-                                                    <button onClick={() => handleEditWorm(worm)} className="p-1 text-gray-400 hover:text-blue-500"><Pencil size={14}/></button>
-                                                    <button onClick={() => handleDeleteWorm(worm.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
+                                                    <MilestoneActionMenu onEdit={() => handleEditWorm(worm)} onDelete={() => handleDeleteWorm(worm.id)} />
                                                 </td>
                                             </tr>
                                         ))}
@@ -1354,34 +1345,6 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                 </div>
             )
         },
-        progressChart: {
-            id: 'progressChart',
-            component: (
-                <div ref={progressChartRef}>
-                    <ChartContainer title="Grafik Progress Kumulatif" icon={<LineChartIcon size={20}/>} headerActions={
-                         <button onClick={() => handleScreenshot(progressChartRef, 'grafik_progres.png')} className="p-1.5 text-gray-500 hover:text-blue-500 dark:hover:text-blue-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" title="Ambil Screenshot">
-                            <Camera size={16} />
-                        </button>
-                    }>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <RechartsLineChart data={weeklyReports} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke={themeStyles.gridStrokeColor}/>
-                                <XAxis dataKey="endDate" tickFormatter={(tick) => new Date(tick).toLocaleDateString('id-ID', { month:'short', day:'2-digit' })} {...commonChartProps.axisTick} />
-                                <YAxis unit="%" {...commonChartProps.axisTick}/>
-                                <Tooltip
-                                    {...commonChartProps}
-                                    labelFormatter={(label) => new Date(label).toLocaleDateString('id-ID', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}
-                                    formatter={(value, name) => [`${(value as number).toFixed(2)}%`, name]}
-                                />
-                                <Legend />
-                                <Line type="monotone" dataKey="planProgressCumulative" name="Rencana" stroke="#8884d8" strokeWidth={2} activeDot={{ r: 8 }} />
-                                <Line type="monotone" dataKey="actualProgressCumulative" name="Aktual" stroke="#82ca9d" strokeWidth={2} activeDot={{ r: 8 }} />
-                            </RechartsLineChart>
-                        </ResponsiveContainer>
-                    </ChartContainer>
-                </div>
-            )
-        },
         weeklyReports: {
             id: 'weeklyReports',
             component: (
@@ -1389,48 +1352,48 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                     <ChartContainer title="Laporan Progress Mingguan" icon={<FileText size={20}/>} headerActions={
                         <>
                             <div className="relative" ref={exportMenuRef}>
-                                <button onClick={() => setIsExportMenuOpen(p => !p)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition">
+                                <button onClick={() => setIsExportMenuOpen(p => !p)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground bg-muted rounded-md hover:bg-muted/80 transition">
                                     <DownloadCloud size={14} /> Export
                                     <ChevronDown size={14} />
                                 </button>
                                 {isExportMenuOpen && (
-                                    <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-10 animate-fade-in-up-fast">
-                                        <button onClick={handleExportWeeklyReportPdf} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">PDF</button>
-                                        <button onClick={handleExportWeeklyReportXlsx} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Excel</button>
+                                    <div className="absolute right-0 mt-2 w-32 bg-card border rounded-lg shadow-xl z-10 animate-fade-in-up-fast">
+                                        <button onClick={handleExportWeeklyReportPdf} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-card-foreground hover:bg-muted">PDF</button>
+                                        <button onClick={handleExportWeeklyReportXlsx} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-card-foreground hover:bg-muted">Excel</button>
                                     </div>
                                 )}
                             </div>
                             <select
                                 value={reportFilters.month}
                                 onChange={(e) => setReportFilters(prev => ({ ...prev, month: e.target.value }))}
-                                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition border-none focus:ring-1 focus:ring-honda-red"
+                                className="px-3 py-1.5 text-xs font-medium text-foreground bg-muted rounded-md hover:bg-muted/80 transition border-none focus:ring-1 focus:ring-primary"
                             >
                                 {uniqueReportMonths.map(month => <option key={month} value={month}>{month === 'all' ? 'Semua Bulan' : month}</option>)}
                             </select>
-                            <button onClick={handleReportSortToggle} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition">
+                            <button onClick={handleReportSortToggle} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground bg-muted rounded-md hover:bg-muted/80 transition">
                             Urutkan {reportSortOrder === 'asc' ? <TrendingUp size={14} /> : <ChevronDown size={14} />}
                             </button>
-                             <button onClick={() => handleScreenshot(weeklyReportsRef, 'laporan_mingguan.png')} className="p-1.5 text-gray-500 hover:text-blue-500 dark:hover:text-blue-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" title="Ambil Screenshot">
+                             <button onClick={() => handleScreenshot(weeklyReportsRef, 'laporan_mingguan.png')} className="p-1.5 text-muted-foreground hover:text-primary rounded-full hover:bg-muted" title="Ambil Screenshot">
                                 <Camera size={16} />
                             </button>
-                            <button onClick={handleOpenAddReportForm} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-honda-red rounded-md hover:bg-red-700 transition shadow">
+                            <button onClick={handleOpenAddReportForm} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition shadow">
                                 <Plus size={14} /> Tambah Laporan
                             </button>
                         </>
                     }>
                         {showWeeklyReportForm && (
-                            <form onSubmit={handleWeeklyReportSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg animate-fade-in-up-fast">
+                            <form onSubmit={handleWeeklyReportSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 p-4 bg-muted/50 rounded-lg animate-fade-in-up-fast">
                                 <div><label className="text-xs">Tgl Mulai</label><input type="date" value={weeklyForm.startDate} onChange={e => setWeeklyForm({...weeklyForm, startDate: e.target.value})} className={inputClasses}/></div>
                                 <div><label className="text-xs">Tgl Selesai</label><input type="date" value={weeklyForm.endDate} onChange={e => setWeeklyForm({...weeklyForm, endDate: e.target.value})} className={inputClasses}/></div>
                                 <div><label className="text-xs">Rencana (%)</label><input type="number" step="0.01" value={weeklyForm.planProgressWeekly} onChange={e => setWeeklyForm({...weeklyForm, planProgressWeekly: parseFloat(e.target.value)})} className={inputClasses}/></div>
                                 <div><label className="text-xs">Aktual (%)</label><input type="number" step="0.01" value={weeklyForm.actualProgressWeekly} onChange={e => setWeeklyForm({...weeklyForm, actualProgressWeekly: parseFloat(e.target.value)})} className={inputClasses}/></div>
                                 <div className="md:col-span-2"><textarea placeholder="Keterangan..." value={weeklyForm.notes} onChange={e => setWeeklyForm({...weeklyForm, notes: e.target.value})} rows={2} className={inputClasses}></textarea></div>
-                                <div className="md:col-span-2 flex justify-end gap-2"><button type="submit" className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">{editingWeeklyReportId ? 'Update' : 'Simpan'}</button><button type="button" onClick={handleCancelReportForm} className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300">Batal</button></div>
+                                <div className="md:col-span-2 flex justify-end gap-2"><button type="submit" className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">{editingWeeklyReportId ? 'Update' : 'Simpan'}</button><button type="button" onClick={handleCancelReportForm} className="px-3 py-1 text-sm bg-muted rounded-md hover:bg-muted/80">Batal</button></div>
                             </form>
                         )}
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
-                                <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50">
+                                <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
                                     <tr>
                                         <th className="px-4 py-2">Periode</th><th className="px-4 py-2">Fase</th><th className="px-4 py-2 text-center">Rencana (%)</th><th className="px-4 py-2 text-center">Aktual (%)</th><th className="px-4 py-2 text-center">Deviasi (%)</th><th className="px-4 py-2">Keterangan</th><th className="px-4 py-2 text-center">Lampiran</th><th className="px-4 py-2 text-center">Aksi</th>
                                     </tr>
@@ -1442,7 +1405,7 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                                         const formatPeriod = (start: string, end: string) => `${new Date(start).toLocaleDateString('id-ID', {day: '2-digit', month: 'short'})} - ${new Date(end).toLocaleDateString('id-ID', {day: '2-digit', month: 'short', year: 'numeric'})}`;
                                         const activePhase = getActivePhaseForDate(row.startDate, localPhases);
                                         return (
-                                            <tr key={row.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/20 text-xs">
+                                            <tr key={row.id} className="border-b border-border hover:bg-muted/30 text-xs">
                                                 <td className="px-4 py-2 font-medium">{formatPeriod(row.startDate, row.endDate)}</td>
                                                 <td className="px-4 py-2">
                                                     {activePhase ? (
@@ -1483,27 +1446,27 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                     <ChartContainer title="Kendala & Risiko" icon={<ShieldAlert size={20}/>} headerActions={
                         <>
                             <div className="relative" ref={riskExportMenuRef}>
-                                <button onClick={() => setIsRiskExportMenuOpen(p => !p)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition">
+                                <button onClick={() => setIsRiskExportMenuOpen(p => !p)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-foreground bg-muted rounded-md hover:bg-muted/80 transition">
                                     <DownloadCloud size={14} /> Export
                                     <ChevronDown size={14} />
                                 </button>
                                 {isRiskExportMenuOpen && (
-                                    <div className="absolute right-0 mt-2 w-32 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg shadow-xl z-10 animate-fade-in-up-fast">
-                                        <button onClick={handleExportRiskPdf} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">PDF</button>
-                                        <button onClick={handleExportRiskXlsx} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Excel</button>
+                                    <div className="absolute right-0 mt-2 w-32 bg-card border rounded-lg shadow-xl z-10 animate-fade-in-up-fast">
+                                        <button onClick={handleExportRiskPdf} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-card-foreground hover:bg-muted">PDF</button>
+                                        <button onClick={handleExportRiskXlsx} className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-card-foreground hover:bg-muted">Excel</button>
                                     </div>
                                 )}
                             </div>
-                            <button onClick={handleRiskTableScreenshot} className="p-1.5 text-gray-500 hover:text-blue-500 dark:hover:text-blue-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" title="Ambil Screenshot Tabel">
+                            <button onClick={handleRiskTableScreenshot} className="p-1.5 text-muted-foreground hover:text-primary rounded-full hover:bg-muted" title="Ambil Screenshot Tabel">
                                 <Camera size={16} />
                             </button>
-                            <button onClick={handleOpenAddRiskForm} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-honda-red rounded-md hover:bg-red-700 transition shadow">
+                            <button onClick={handleOpenAddRiskForm} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition shadow">
                                 <Plus size={14} /> Tambah Risiko
                             </button>
                         </>
                     }>
                         {showRiskForm && (
-                            <form onSubmit={handleRiskSubmit} className="space-y-4 mb-4 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg animate-fade-in-up-fast">
+                            <form onSubmit={handleRiskSubmit} className="space-y-4 mb-4 p-4 bg-muted/50 rounded-lg animate-fade-in-up-fast">
                                 <div>
                                 <label className="text-xs">Terkait Laporan Minggu</label>
                                 <select value={riskForm.weeklyReportId} onChange={e => setRiskForm({...riskForm, weeklyReportId: e.target.value})} className={inputClasses}> 
@@ -1521,12 +1484,12 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                                     <div><label className="text-xs">Prioritas</label><select value={riskForm.priority} onChange={e => setRiskForm({...riskForm, priority: e.target.value as Risk['priority']})} className={inputClasses}><option>Low</option><option>Medium</option><option>High</option></select></div>
                                     <div><label className="text-xs">Status</label><select value={riskForm.status} onChange={e => setRiskForm({...riskForm, status: e.target.value as Risk['status']})} className={inputClasses}><option>Ditangani</option><option>Monitoring</option><option>Selesai</option></select></div>
                                 </div>
-                                <div className="flex justify-end gap-2"><button type="submit" className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">{editingRiskId ? 'Update' : 'Simpan'}</button><button type="button" onClick={() => setShowRiskForm(false)} className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-600 rounded-md hover:bg-gray-300">Batal</button></div>
+                                <div className="flex justify-end gap-2"><button type="submit" className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">{editingRiskId ? 'Update' : 'Simpan'}</button><button type="button" onClick={() => setShowRiskForm(false)} className="px-3 py-1 text-sm bg-muted rounded-md hover:bg-muted/80">Batal</button></div>
                             </form>
                         )}
                         <div className="overflow-x-auto">
                             <table ref={risksTableRef} className="w-full text-sm text-left">
-                                <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50">
+                                <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
                                     <tr>
                                         <th className="px-4 py-2">Terkait Laporan</th><th className="px-4 py-2">Deskripsi</th><th className="px-4 py-2">Dampak</th><th className="px-4 py-2">Solusi</th><th className="px-4 py-2 text-center">Prioritas</th><th className="px-4 py-2 text-center">Status</th><th className="px-4 py-2 text-center">Aksi</th>
                                     </tr>
@@ -1536,14 +1499,14 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                                         const report = weeklyReports.find(r => r.id === risk.weeklyReportId);
                                         const reportLabel = report ? `Minggu ${new Date(report.startDate).toLocaleDateString('id-ID', {day:'2-digit', month:'short'})} - ${new Date(report.endDate).toLocaleDateString('id-ID', {day:'2-digit', month:'short'})}` : 'N/A';
                                         return (
-                                        <tr key={risk.id} className="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/20 text-xs">
+                                        <tr key={risk.id} className="border-b border-border hover:bg-muted/30 text-xs">
                                             <td className="px-4 py-2">{reportLabel}</td>
                                             <td className="px-4 py-2 font-medium max-w-xs truncate" title={risk.desc}>{risk.desc}</td>
                                             <td className="px-4 py-2 max-w-xs truncate" title={risk.impact}>{risk.impact}</td>
                                             <td className="px-4 py-2 max-w-xs truncate" title={risk.solution}>{risk.solution}</td>
                                             <td className="px-4 py-2 text-center"><PriorityBadge priority={risk.priority}/></td>
-                                            <td className="px-4 py-2 text-center"><span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">{risk.status}</span></td>
-                                            <td className="px-4 py-2 text-center"><button onClick={() => handleEditRisk(risk)} className="p-1 text-gray-400 hover:text-blue-500"><Pencil size={14}/></button><button onClick={() => handleDeleteRisk(risk.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={14}/></button></td>
+                                            <td className="px-4 py-2 text-center"><span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-muted text-muted-foreground">{risk.status}</span></td>
+                                            <td className="px-4 py-2 text-center"><button onClick={() => handleEditRisk(risk)} className="p-1 text-muted-foreground hover:text-blue-500"><Pencil size={14}/></button><button onClick={() => handleDeleteRisk(risk.id)} className="p-1 text-muted-foreground hover:text-red-500"><Trash2 size={14}/></button></td>
                                         </tr>
                                     )})}
                                 </tbody>
@@ -1562,26 +1525,26 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                              <select
                                 value={galleryPhaseFilter}
                                 onChange={(e) => setGalleryPhaseFilter(e.target.value)}
-                                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition border-none focus:ring-1 focus:ring-honda-red"
+                                className="px-3 py-1.5 text-xs font-medium text-foreground bg-muted rounded-md hover:bg-muted/80 transition border-none focus:ring-1 focus:ring-primary"
                             >
                                 <option value="all">Semua Fase</option>
                                 {phaseOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                             </select>
-                             <button onClick={() => handleScreenshot(galleryRef, 'dokumentasi_lapangan.png')} className="p-1.5 text-gray-500 hover:text-blue-500 dark:hover:text-blue-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700" title="Ambil Screenshot">
+                             <button onClick={() => handleScreenshot(galleryRef, 'dokumentasi_lapangan.png')} className="p-1.5 text-muted-foreground hover:text-primary rounded-full hover:bg-muted" title="Ambil Screenshot">
                                 <Camera size={16} />
                             </button>
-                            <button onClick={() => setShowGalleryForm(p => !p)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-honda-red rounded-md hover:bg-red-700 transition shadow"><Plus size={14}/> Tambah Foto</button>
+                            <button onClick={() => setShowGalleryForm(p => !p)} className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-primary-foreground bg-primary rounded-md hover:bg-primary/90 transition shadow"><Plus size={14}/> Tambah Foto</button>
                         </>
                     }>
                         {showGalleryForm && (
-                            <form onSubmit={handleAddGalleryItem} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-gray-50 dark:bg-gray-700/30 rounded-lg animate-fade-in-up-fast">
+                            <form onSubmit={handleAddGalleryItem} className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 p-4 bg-muted/50 rounded-lg animate-fade-in-up-fast">
                                 <div>
                                     <label className="text-xs">File Gambar</label>
                                     <input 
                                         type="file" 
                                         accept="image/*"
                                         onChange={e => setGalleryFile(e.target.files ? e.target.files[0] : null)} 
-                                        className={`${inputClasses} p-1 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-honda-red/10 file:text-honda-red hover:file:bg-honda-red/20`}
+                                        className={`${inputClasses} p-1 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20`}
                                     />
                                 </div>
                                 <div>
@@ -1613,12 +1576,12 @@ const ProjectReport = ({ project, setProjects }: { project: Project | null, setP
                                 </div>
                             ))}
                         </div>
-                         {filteredGallery.length === 0 && <p className="text-center text-gray-500 text-sm py-4">Tidak ada dokumentasi untuk fase ini.</p>}
+                         {filteredGallery.length === 0 && <p className="text-center text-muted-foreground text-sm py-4">Tidak ada dokumentasi untuk fase ini.</p>}
                     </ChartContainer>
                 </div>
             )
         }
-    }), [project, visibility, weeklyReports, risks, gallery, scheduleWorms, localPhases, hasChanges, theme, showWeeklyReportForm, showRiskForm, showGalleryForm, showWormForm, isPhasesTableVisible, isWormTableVisible, isSettingsOpen, isExportMenuOpen, isRiskExportMenuOpen, weeklyForm, editingWeeklyReportId, riskForm, editingRiskId, galleryForm, wormForm, editingWormId, milestonePhaseFilter, reportFilters, reportSortOrder, galleryPhaseFilter, galleryFile, getActivePhaseForDate, timeVariance, riskLevel]);
+    }), [project, visibility, weeklyReports, risks, gallery, scheduleWorms, localPhases, hasChanges, theme, showWeeklyReportForm, showRiskForm, showGalleryForm, showWormForm, isPhasesTableVisible, isWormTableVisible, isSettingsOpen, isExportMenuOpen, isRiskExportMenuOpen, weeklyForm, editingWeeklyReportId, riskForm, editingRiskId, galleryForm, wormForm, editingWormId, milestonePhaseFilter, reportFilters, reportSortOrder, galleryPhaseFilter, galleryFile, getActivePhaseForDate, timeVariance, daysRemaining, isOverdue, activeRisksCount]);
 
     return (
         <div className="space-y-6 animate-fade-in-up">

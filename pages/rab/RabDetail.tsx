@@ -6,10 +6,13 @@
 
 
 
+
+
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { type RabDocument, type RabDetailItem, type AhsComponent, type PriceDatabaseItem, type WorkItem } from '../../types';
-import { Plus, Trash2, ArrowLeft, Save, Pencil, Check, Zap, Loader2, ArrowUp, ArrowDown, FileText, X, ChevronDown, Database, SlidersHorizontal, AlertTriangle, Layers, Calculator, Wand2, CheckCircle, Send, Upload, Download, FileDown, Lock, Edit, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, Save, Pencil, Check, Zap, Loader2, ArrowUp, ArrowDown, FileText, X, ChevronDown, Database, SlidersHorizontal, AlertTriangle, Layers, Calculator, Wand2, CheckCircle, Send, Upload, Download, FileDown, Lock, Edit, RotateCcw, PlusCircle } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 import { generateAhsForSingleItem } from '../../services/geminiService';
 import jsPDF from 'jspdf';
@@ -38,7 +41,7 @@ const AutoResizeTextarea = React.forwardRef<HTMLTextAreaElement, React.TextareaH
 AutoResizeTextarea.displayName = 'AutoResizeTextarea';
 
 const formatNumber = (amount: number | null, decimals = 0) => {
-    if (amount === null || typeof amount === 'undefined' || isNaN(amount)) return '0';
+    if (amount === null || typeof amount === 'undefined' || isNaN(amount) || amount === 0) return '';
     return new Intl.NumberFormat('id-ID', {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
@@ -133,7 +136,7 @@ const PriceSourceModal = ({ isOpen, onClose, onApply }: { isOpen: boolean, onClo
                 </div>
                 <div className="flex justify-end gap-3 mt-6">
                     <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:text-gray-200 dark:bg-gray-700 dark:border-gray-600 dark:hover:bg-gray-600 transition">Batal</button>
-                    <button onClick={() => onApply(source)} className="px-4 py-2 text-sm font-semibold text-white bg-honda-red rounded-lg hover:bg-red-700 transition shadow">Terapkan</button>
+                    <button onClick={() => onApply(source)} className="px-4 py-2 text-sm font-semibold text-white bg-destructive rounded-lg hover:bg-destructive/90 transition shadow">Terapkan</button>
                 </div>
             </div>
         </div>
@@ -181,8 +184,7 @@ const MissingItemsModal = ({ isOpen, onClose, missingItems, onStartAhsCreation, 
 
 interface RabDetailRowProps {
     item: RabDetailItem;
-    categoryIndex: number;
-    itemIndex: number;
+    itemNumberString: string;
     rowIndex: number;
     totalRows: number;
     onUpdate: (id: string, field: keyof RabDetailItem, value: any) => void;
@@ -194,10 +196,11 @@ interface RabDetailRowProps {
     onApplyLocalPriceSource: (itemId: string, source: RabDetailItem['priceSource']) => void;
     categorySubtotals: Map<string, number>;
     isLocked: boolean;
+    onAddSubItem: (id: string) => void;
 }
 
-const RabDetailRow = React.memo(({ item, categoryIndex, itemIndex, rowIndex, totalRows, onUpdate, onToggleDelete, onToggleEdit, onSaveRow, onMove, onManageAhs, onApplyLocalPriceSource, categorySubtotals, isLocked }: RabDetailRowProps) => {
-    const inputClasses = "w-full p-1 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-honda-red focus:border-transparent transition bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 text-xs placeholder-gray-400";
+const RabDetailRow = React.memo(({ item, itemNumberString, rowIndex, totalRows, onUpdate, onToggleDelete, onToggleEdit, onSaveRow, onMove, onManageAhs, onApplyLocalPriceSource, categorySubtotals, isLocked, onAddSubItem }: RabDetailRowProps) => {
+    const inputClasses = "w-full p-1 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-destructive focus:border-transparent transition bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 text-xs placeholder-gray-400";
     const viewClasses = "block px-1 py-1 text-xs";
     const isCategory = item.type === 'category';
     
@@ -207,21 +210,38 @@ const RabDetailRow = React.memo(({ item, categoryIndex, itemIndex, rowIndex, tot
 
     const rowClasses = [
         isCategory ? 'bg-gray-200/70 dark:bg-gray-700/70 font-bold' : 'bg-white dark:bg-gray-800/60',
-        'border-b dark:border-gray-700/50 hover:bg-honda-red/5 dark:hover:bg-honda-red/10 transition-colors duration-200',
+        'border-b dark:border-gray-700/50 hover:bg-destructive/5 dark:hover:bg-destructive/10 transition-colors duration-200',
         isDeleted ? 'bg-red-50/50 dark:bg-red-900/40 text-red-700 dark:text-red-500 opacity-70' : '',
         isNew ? 'bg-green-50/50 dark:bg-green-900/40' : ''
     ].join(' ');
 
     const textClasses = isDeleted ? 'line-through' : '';
+    
+    const indentLevel = item.indent || 0;
+    const indentPadding = { paddingLeft: `${indentLevel * 1.5}rem` };
+
+    const addSubItemTitle = item.type === 'category' ? 'Tambah Sub Kategori' : 'Tambah Sub Item';
+    
+    const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.currentTarget.blur();
+        }
+    };
 
     const actionButtons = (
         <div className="flex justify-center items-center gap-1">
+            {!isDeleted && (
+                <button disabled={isLocked} onClick={() => onAddSubItem(item.id)} className="p-1 text-gray-500 hover:text-green-600 dark:hover:text-green-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title={addSubItemTitle}>
+                    <PlusCircle size={12}/>
+                </button>
+            )}
             {!isDeleted && (canEdit ? (
                 <button onClick={() => onSaveRow(item.id)} className="p-1 text-green-600 hover:text-green-700 dark:hover:text-green-400 transition-colors" title="Simpan Baris"><Check size={12}/></button>
             ) : (
                 <button disabled={isLocked} onClick={() => onToggleEdit(item.id)} className="p-1 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Edit Baris"><Pencil size={12}/></button>
             ))}
-            <button disabled={isLocked} onClick={() => onToggleDelete(item.id)} className={`p-1 transition-colors ${isDeleted ? 'text-blue-600 hover:text-blue-500' : 'text-gray-500 hover:text-honda-red dark:hover:text-red-400'} disabled:opacity-30 disabled:cursor-not-allowed`} title={isDeleted ? "Pulihkan Baris" : "Hapus Baris"}>
+            <button disabled={isLocked} onClick={() => onToggleDelete(item.id)} className={`p-1 transition-colors ${isDeleted ? 'text-blue-600 hover:text-blue-500' : 'text-gray-500 hover:text-destructive dark:hover:text-red-400'} disabled:opacity-30 disabled:cursor-not-allowed`} title={isDeleted ? "Pulihkan Baris" : "Hapus Baris"}>
                  {isDeleted ? <RotateCcw size={12}/> : <Trash2 size={12}/>}
             </button>
         </div>
@@ -229,10 +249,10 @@ const RabDetailRow = React.memo(({ item, categoryIndex, itemIndex, rowIndex, tot
 
     const moveButtons = (
         <div className="flex items-center justify-center gap-x-1 h-full">
-            <span className={`text-xs text-gray-800 dark:text-gray-300 w-5 text-center ${isCategory ? 'font-bold' : ''}`}>{isCategory ? romanize(categoryIndex) : `${itemIndex}`}</span>
+            <span className={`text-xs text-gray-800 dark:text-gray-300 w-10 text-center ${isCategory ? 'font-bold' : ''}`}>{itemNumberString}</span>
             <div className="flex flex-col">
-                <button onClick={() => onMove(rowIndex, 'up')} disabled={isLocked || rowIndex === 0} className="p-0.5 text-gray-400 hover:text-honda-red disabled:opacity-20 disabled:cursor-not-allowed" title="Pindah Atas"><ArrowUp size={10} /></button>
-                <button onClick={() => onMove(rowIndex, 'down')} disabled={isLocked || rowIndex === totalRows - 1} className="p-0.5 text-gray-400 hover:text-honda-red disabled:opacity-20 disabled:cursor-not-allowed" title="Pindah Bawah"><ArrowDown size={10} /></button>
+                <button onClick={() => onMove(rowIndex, 'up')} disabled={isLocked || rowIndex === 0} className="p-0.5 text-gray-400 hover:text-destructive disabled:opacity-20 disabled:cursor-not-allowed" title="Pindah Atas"><ArrowUp size={10} /></button>
+                <button onClick={() => onMove(rowIndex, 'down')} disabled={isLocked || rowIndex === totalRows - 1} className="p-0.5 text-gray-400 hover:text-destructive disabled:opacity-20 disabled:cursor-not-allowed" title="Pindah Bawah"><ArrowDown size={10} /></button>
             </div>
         </div>
     );
@@ -240,20 +260,78 @@ const RabDetailRow = React.memo(({ item, categoryIndex, itemIndex, rowIndex, tot
     return (
         <tr className={rowClasses}>
             <td className="px-1 py-1 text-center align-top w-16">{moveButtons}</td>
-            <td className="px-2 py-1 align-top min-w-[300px]">
+            <td className="px-2 py-1 align-top min-w-[300px]" style={indentPadding}>
                 {canEdit ? (<AutoResizeTextarea value={item.uraianPekerjaan} onChange={(e) => onUpdate(item.id, 'uraianPekerjaan', e.target.value)} className={`${inputClasses} text-left ${isCategory ? 'font-bold text-xs' : 'text-xs'}`} />) : (<span className={`${viewClasses} ${textClasses}`}>{item.uraianPekerjaan}</span>)}
             </td>
             <td className="px-2 py-1 align-top w-24">
                 {canEdit && !isCategory ? (<input type="text" value={item.satuan} onChange={(e) => onUpdate(item.id, 'satuan', e.target.value)} className={`${inputClasses} text-center`} />) : (<span className={`${viewClasses} text-center ${textClasses}`}>{isCategory ? '' : item.satuan}</span>)}
             </td>
             <td className="px-2 py-1 align-top w-28">
-                {canEdit && !isCategory ? (<input type="number" value={item.volume} step="0.01" onChange={(e) => onUpdate(item.id, 'volume', parseFloat(e.target.value) || 0)} className={`${inputClasses} text-right`} min="0" />) : (<span className={`${viewClasses} text-right ${textClasses}`}>{isCategory ? '' : item.volume.toFixed(2).replace('.', ',')}</span>)}
+                {canEdit && !isCategory ? (
+                    <input
+                        type="text"
+                        defaultValue={item.volume ? item.volume.toString().replace('.', ',') : ''}
+                        onKeyDown={handleInputKeyDown}
+                        onBlur={(e) => {
+                            const value = e.currentTarget.value;
+                            if (value.startsWith('=')) {
+                                const expression = value.substring(1).replace(/,/g, '.');
+                                try {
+                                    const result = new Function('return ' + expression)();
+                                    if (typeof result === 'number' && !isNaN(result)) {
+                                        onUpdate(item.id, 'volume', result);
+                                    } else {
+                                        toast.error('Hasil formula tidak valid.');
+                                    }
+                                } catch (err) {
+                                    toast.error('Formula tidak valid.');
+                                }
+                            } else {
+                                const parsedValue = parseFloat(value.replace(',', '.'));
+                                onUpdate(item.id, 'volume', isNaN(parsedValue) ? null : parsedValue);
+                            }
+                        }}
+                        className={`${inputClasses} text-right`}
+                    />
+                ) : (
+                    <span className={`${viewClasses} text-right ${textClasses}`}>{isCategory ? '' : (item.volume ? item.volume.toFixed(2).replace('.', ',') : '')}</span>
+                )}
             </td>
             <td className="px-2 py-1 align-top w-40 relative">
-                {item.isPricingLoading && <Loader2 className="absolute left-2 top-1/2 -translate-y-1/2 animate-spin text-honda-red" size={14} />}
-                {canEdit && !isCategory ? (<input type="number" value={item.hargaSatuan} onChange={(e) => { onUpdate(item.id, 'hargaSatuan', parseInt(e.target.value, 10) || 0); onUpdate(item.id, 'priceSource', 'manual'); }} className={`${inputClasses} text-right`} min="0" />) : (<span className={`${viewClasses} text-right ${textClasses}`}>{isCategory ? '' : formatNumber(item.hargaSatuan)}</span>)}
+                {item.isPricingLoading && <Loader2 className="absolute left-2 top-1/2 -translate-y-1/2 animate-spin text-destructive" size={14} />}
+                 {canEdit && !isCategory ? (
+                    <input
+                        type="text"
+                        defaultValue={item.hargaSatuan ? item.hargaSatuan.toString() : ''}
+                        onKeyDown={handleInputKeyDown}
+                        onBlur={(e) => {
+                            const value = e.currentTarget.value;
+                            if (value.startsWith('=')) {
+                                const expression = value.substring(1).replace(/,/g, '.');
+                                try {
+                                    const result = new Function('return ' + expression)();
+                                    if (typeof result === 'number' && !isNaN(result)) {
+                                        onUpdate(item.id, 'hargaSatuan', Math.round(result));
+                                        onUpdate(item.id, 'priceSource', 'manual');
+                                    } else {
+                                        toast.error('Hasil formula tidak valid.');
+                                    }
+                                } catch (err) {
+                                    toast.error('Formula tidak valid.');
+                                }
+                            } else {
+                                const parsedValue = parseFloat(value.replace(',', '.'));
+                                onUpdate(item.id, 'hargaSatuan', isNaN(parsedValue) ? 0 : Math.round(parsedValue));
+                                onUpdate(item.id, 'priceSource', 'manual');
+                            }
+                        }}
+                        className={`${inputClasses} text-right`}
+                    />
+                ) : (
+                    <span className={`${viewClasses} text-right ${textClasses}`}>{isCategory ? '' : formatNumber(item.hargaSatuan)}</span>
+                )}
             </td>
-            <td className={`px-2 py-1 align-top text-right w-44 text-xs ${isCategory ? 'font-bold text-gray-900 dark:text-gray-200' : 'text-gray-800 dark:text-gray-100'} ${textClasses}`}>{isCategory ? formatNumber(categorySubtotals.get(item.id) || 0) : formatNumber(item.volume * item.hargaSatuan)}</td>
+            <td className={`px-2 py-1 align-top text-right w-44 text-xs ${isCategory ? 'font-bold text-gray-900 dark:text-gray-200' : 'text-gray-800 dark:text-gray-100'} ${textClasses}`}>{formatNumber(isCategory ? (categorySubtotals.get(item.id) || 0) : ((item.volume || 0) * item.hargaSatuan))}</td>
             <td className="px-2 py-1 align-top min-w-[150px]">
                 {canEdit ? (<AutoResizeTextarea value={item.keterangan} onChange={(e) => onUpdate(item.id, 'keterangan', e.target.value)} className={`${inputClasses} text-left`} />) : (<span className={`${viewClasses} ${textClasses}`}>{item.keterangan}</span>)}
             </td>
@@ -342,6 +420,70 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
 
     const visibleItems = useMemo(() => showDeleted ? sourceItems : sourceItems.filter(item => !item.isDeleted), [sourceItems, showDeleted]);
     
+    const itemNumbers = useMemo(() => {
+        const numberMap = new Map<string, string>();
+        let topLevelCategoryCounter = 0;
+        
+        // Map to store counters for children under a specific parent ID.
+        // The key is parentId, the value is an object { cat: count, item: count }
+        const counters = new Map<string, { cat: number, item: number }>();
+
+        visibleItems.forEach((item, index) => {
+            const indent = item.indent || 0;
+            let parent = null;
+            
+            // Find the direct parent
+            if (indent > 0) {
+                // This is more reliable than reverse().find() as it finds the *direct* parent.
+                for (let i = index - 1; i >= 0; i--) {
+                    if ((visibleItems[i].indent || 0) === indent - 1) {
+                        parent = visibleItems[i];
+                        break;
+                    }
+                }
+            }
+
+            if (item.type === 'category') {
+                if (indent === 0) {
+                    topLevelCategoryCounter++;
+                    const roman = romanize(topLevelCategoryCounter);
+                    numberMap.set(item.id, roman);
+                } else {
+                    if (parent) {
+                        const parentNumStr = numberMap.get(parent.id);
+                        const parentCounters = counters.get(parent.id) || { cat: 0, item: 0 };
+                        parentCounters.cat++;
+                        counters.set(parent.id, parentCounters);
+                        
+                        const newNumStr = `${parentNumStr}.${parentCounters.cat}`;
+                        numberMap.set(item.id, newNumStr);
+                    } else {
+                        numberMap.set(item.id, `?.?`);
+                    }
+                }
+            } else { // type === 'item'
+                if (parent) {
+                    const parentNumStr = numberMap.get(parent.id);
+                    const parentCounters = counters.get(parent.id) || { cat: 0, item: 0 };
+                    parentCounters.item++;
+                    counters.set(parent.id, parentCounters);
+                    
+                    const newNumStr = `${parentNumStr}.${parentCounters.item}`;
+                    numberMap.set(item.id, newNumStr);
+                } else {
+                    // This would be a top-level item without a category.
+                    // Fallback to a simple counter.
+                    const rootCounters = counters.get('root_items') || { cat: 0, item: 0 };
+                    rootCounters.item++;
+                    counters.set('root_items', rootCounters);
+                    numberMap.set(item.id, String(rootCounters.item));
+                }
+            }
+        });
+
+        return numberMap;
+    }, [visibleItems]);
+
     const totalRAB = useMemo(() => sourceItems.reduce((sum, item) => sum + (item.type === 'item' && !item.isDeleted ? (Number(item.volume) * Number(item.hargaSatuan)) : 0), 0), [sourceItems]);
 
     const categorySubtotals = useMemo(() => {
@@ -351,11 +493,11 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
                 let subtotal = 0;
                 for (let i = index + 1; i < sourceItems.length; i++) {
                     const nextItem = sourceItems[i];
-                    if (nextItem.type === 'category') {
+                    if (nextItem.type === 'category' && (nextItem.indent || 0) <= (item.indent || 0)) {
                         break; 
                     }
-                    if (!nextItem.isDeleted) {
-                        subtotal += (nextItem.volume * nextItem.hargaSatuan);
+                    if (nextItem.type === 'item' && !nextItem.isDeleted) {
+                        subtotal += ((nextItem.volume || 0) * nextItem.hargaSatuan);
                     }
                 }
                 subtotals.set(item.id, subtotal);
@@ -370,6 +512,49 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
     const handleAddCategory = () => { setDetailItems([...detailItems, { id: `cat-${Date.now()}`, type: 'category', uraianPekerjaan: 'KATEGORI BARU', volume: 0, satuan: '', hargaSatuan: 0, keterangan: '', isEditing: true, isSaved: false, isNew: true }]); setHasUnsavedChanges(true); };
     const handleAddItem = () => { setDetailItems([...detailItems, { id: `item-${Date.now()}`, type: 'item', uraianPekerjaan: '', volume: 1.00, satuan: '', hargaSatuan: 0, keterangan: '', isEditing: true, isSaved: false, priceSource: 'manual', isNew: true }]); setHasUnsavedChanges(true); };
     
+    const handleAddSubItem = useCallback((parentId: string) => {
+        setDetailItems(currentItems => {
+            const parentIndex = currentItems.findIndex(i => i.id === parentId);
+            if (parentIndex === -1) return currentItems;
+    
+            const parentItem = currentItems[parentIndex];
+            const newType = parentItem.type === 'category' ? 'category' : 'item';
+            const newUraian = newType === 'category' ? 'SUB KATEGORI BARU' : 'Sub Item Baru';
+    
+            const parentIndent = parentItem.indent || 0;
+            const newIndent = parentIndent + 1;
+            
+            let insertAtIndex = parentIndex + 1;
+            // Find the end of the parent's children block
+            while (
+                insertAtIndex < currentItems.length && 
+                (currentItems[insertAtIndex].indent || 0) > parentIndent
+            ) {
+                insertAtIndex++;
+            }
+    
+            const newSubItem: RabDetailItem = {
+                id: `${newType}-${Date.now()}`,
+                type: newType,
+                uraianPekerjaan: newUraian,
+                volume: newType === 'item' ? 1.00 : 0,
+                satuan: '',
+                hargaSatuan: 0,
+                keterangan: '',
+                isEditing: true,
+                isSaved: false,
+                priceSource: newType === 'item' ? 'manual' : undefined,
+                isNew: true,
+                indent: newIndent,
+            };
+            
+            const newItems = [...currentItems];
+            newItems.splice(insertAtIndex, 0, newSubItem);
+            return newItems;
+        });
+        setHasUnsavedChanges(true);
+    }, []);
+
     const handleToggleDeleteItem = useCallback((id: string) => {
         const item = detailItems.find(i => i.id === id);
         if (!item) return;
@@ -424,18 +609,17 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
 
     // --- Pricing Logic Implementation ---
 
-    const applyPrices = useCallback((source: RabDetailItem['priceSource'], itemsToPrice: RabDetailItem[]) => {
-        const itemsWithPrices = itemsToPrice.map(item => {
+    const applyPrices = useCallback((source: RabDetailItem['priceSource'], itemsToUpdate: RabDetailItem[]) => {
+        const itemsWithPrices = itemsToUpdate.map(item => {
             let newPrice = item.hargaSatuan;
             let finalSource = item.priceSource;
-
             const workItem = workItems.find(wi => wi.name.toLowerCase() === item.uraianPekerjaan.toLowerCase());
             
             if (source === 'db') {
                 newPrice = workItem!.defaultPrice;
                 finalSource = 'db';
             } else if (source === 'ahs') {
-                const ahs = workItem ? workItem.defaultAhs : item.ahs;
+                const ahs = workItem?.defaultAhs || item.ahs;
                 const basePrice = (ahs || []).reduce((sum, comp) => sum + (comp.quantity * comp.unitPrice), 0);
                 const totalPercentage = (item.pph || 0) + (item.overhead || 0) + (item.margin || 0);
                 newPrice = basePrice * (1 + totalPercentage / 100);
@@ -454,40 +638,93 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
             return { ...item, hargaSatuan: newPrice, priceSource: finalSource, isPricingLoading: false };
         });
 
-        // Merge back into all detail items
         setDetailItems(currentItems => {
-            const newItems = [...currentItems];
-            itemsWithPrices.forEach(updatedItem => {
-                const index = newItems.findIndex(i => i.id === updatedItem.id);
-                if (index !== -1) newItems[index] = updatedItem;
-            });
-            return newItems;
+            const newItemsMap = new Map(itemsWithPrices.map(i => [i.id, i]));
+            return currentItems.map(item => newItemsMap.get(item.id) || item);
         });
+
         setHasUnsavedChanges(true);
         toast.success('Harga berhasil diterapkan.');
     }, [workItems]);
 
-    const handleApplyPriceSource = useCallback((source: RabDetailItem['priceSource'], itemIds?: string[]) => {
-        const allWorkItemsInRAB = detailItems.filter(i => i.type === 'item');
+    const handleApplyPriceSource = useCallback(async (source: RabDetailItem['priceSource'], itemIds?: string[]) => {
+        const allWorkItemsInRAB = detailItems.filter(i => i.type === 'item' && !i.isDeleted);
         const itemsToProcess = itemIds ? allWorkItemsInRAB.filter(i => itemIds.includes(i.id)) : allWorkItemsInRAB;
-
         if (itemsToProcess.length === 0) return;
 
-        // Set loading state
+        // NEW: Automatic AHS Generation Flow for "Gunakan AHS" on all items
+        if (source === 'ahs' && !itemIds) {
+            const itemsNeedingAhs = itemsToProcess.filter(item => {
+                const workItem = workItems.find(wi => wi.name.toLowerCase() === item.uraianPekerjaan.toLowerCase());
+                const hasExistingAhs = (item.ahs && item.ahs.length > 0) || (workItem?.defaultAhs && workItem.defaultAhs.length > 0);
+                return !hasExistingAhs && item.uraianPekerjaan.trim() !== '';
+            });
+
+            let itemsWithGeneratedAhs = [...detailItems];
+
+            if (itemsNeedingAhs.length > 0) {
+                setDetailItems(current => current.map(item => itemsNeedingAhs.some(p => p.id === item.id) ? { ...item, isPricingLoading: true } : item));
+                
+                const generationPromise = Promise.allSettled(
+                    itemsNeedingAhs.map(item => generateAhsForSingleItem(item.uraianPekerjaan).then(ahs => ({ id: item.id, ahs, uraian: item.uraianPekerjaan })))
+                );
+                
+                await toast.promise(generationPromise, {
+                    loading: `Membuat AHS otomatis untuk ${itemsNeedingAhs.length} item...`,
+                    success: 'Pembuatan AHS selesai.',
+                    error: 'Gagal membuat AHS untuk beberapa item.'
+                });
+
+                const results = await generationPromise;
+                let successfulCount = 0;
+                const failedItems: string[] = [];
+
+                itemsWithGeneratedAhs = itemsWithGeneratedAhs.map(currentItem => {
+                    const result = results.find(res => res.status === 'fulfilled' && res.value.id === currentItem.id);
+                    if (result && result.status === 'fulfilled') {
+                        if (result.value.ahs.length > 0) {
+                            successfulCount++;
+                            return { ...currentItem, ahs: result.value.ahs, isPricingLoading: false };
+                        }
+                        failedItems.push(result.value.uraian);
+                        return { ...currentItem, isPricingLoading: false };
+                    }
+                    // Find corresponding rejected promise if any
+                     const rejectedResult = results.find(res => res.status === 'rejected' && res.reason && typeof res.reason === 'object' && 'id' in res.reason && (res.reason as any).id === currentItem.id);
+                     if(rejectedResult){
+                         return { ...currentItem, isPricingLoading: false };
+                     }
+                    return currentItem;
+                });
+                
+                setDetailItems(itemsWithGeneratedAhs); // Update state with newly generated AHS and remove loading spinners
+
+                if (failedItems.length > 0) toast.error(`Tidak dapat membuat AHS untuk: ${failedItems.join(', ')}`);
+                if (successfulCount > 0) toast.success(`${successfulCount} AHS berhasil dibuat.`);
+
+            } else {
+                toast.success("Semua item sudah memiliki AHS.");
+            }
+            
+            // Proceed to apply prices using the potentially updated items
+            applyPrices('ahs', itemsWithGeneratedAhs.filter(i => i.type === 'item'));
+            return;
+        }
+
+        // --- Original logic for DB, Combined, and single-item AHS pricing ---
         setDetailItems(current => current.map(item => itemsToProcess.some(p => p.id === item.id) ? { ...item, isPricingLoading: true } : item));
         
         let missing: RabDetailItem[] = [];
         if (source === 'db' || source === 'combined') {
             missing = itemsToProcess.filter(item => {
                 const workItemExists = workItems.some(wi => wi.name.toLowerCase() === item.uraianPekerjaan.toLowerCase());
-                // For combined, it's only missing if it's not in DB AND has no AHS
                 if (source === 'combined' && !workItemExists) {
                     return !item.ahs || item.ahs.length === 0;
                 }
-                return !workItemExists; // For 'db' source, it's missing if not in DB
+                return !workItemExists;
             });
         }
-        if (source === 'ahs') {
+        if (source === 'ahs' && itemIds) { // only for single item AHS
             missing = itemsToProcess.filter(item => {
                  const workItem = workItems.find(wi => wi.name.toLowerCase() === item.uraianPekerjaan.toLowerCase());
                  const ahs = workItem?.defaultAhs || item.ahs;
@@ -498,24 +735,56 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
         if (missing.length > 0) {
             setMissingWorkItems(missing);
             setIsMissingItemsModalOpen(true);
-            setDetailItems(current => current.map(item => ({...item, isPricingLoading: false }))); // Reset loading
+            setDetailItems(current => current.map(item => ({...item, isPricingLoading: false })));
             return;
         }
 
-        // If no items are missing, proceed with pricing
         applyPrices(source, itemsToProcess);
 
     }, [detailItems, workItems, applyPrices]);
+    
+    const handleApplyLocalPriceSource = useCallback(async (itemId: string, source: RabDetailItem['priceSource']) => {
+        if (source === 'ahs') {
+            const item = detailItems.find(i => i.id === itemId);
+            if (!item) return;
+    
+            const workItem = workItems.find(wi => wi.name.toLowerCase() === item.uraianPekerjaan.toLowerCase());
+            const existingAhs = workItem?.defaultAhs || item.ahs;
+    
+            if (existingAhs && existingAhs.length > 0) {
+                // If AHS exists, just apply it
+                handleApplyPriceSource('ahs', [itemId]);
+            } else {
+                // If AHS does not exist, generate with AI then open modal
+                const toastId = toast.loading('Membuat AHS dengan AI...');
+                setDetailItems(current => current.map(i => i.id === itemId ? { ...i, isPricingLoading: true } : i));
+                try {
+                    const newAhs = await generateAhsForSingleItem(item.uraianPekerjaan);
+                    if (newAhs.length > 0) {
+                        const tempItemWithAhs = { ...item, ahs: newAhs, isPricingLoading: false };
+                        setEditingAhsItem(tempItemWithAhs); // This will open the modal
+                        toast.success('AHS dibuat! Silakan periksa dan simpan.', { id: toastId });
+                    } else {
+                         toast.error('AI tidak dapat membuat AHS untuk pekerjaan ini.', { id: toastId });
+                    }
+                } catch (error) {
+                    console.error(error);
+                    toast.error('Gagal membuat AHS.', { id: toastId });
+                } finally {
+                    setDetailItems(current => current.map(i => ({ ...i, isPricingLoading: false })));
+                }
+            }
+        } else {
+            // For other sources, use the existing logic
+            handleApplyPriceSource(source, [itemId]);
+        }
+    }, [detailItems, workItems, handleApplyPriceSource]);
 
     const handleApplyGlobalPriceSource = (source: RabDetailItem['priceSource']) => {
         setIsPriceSourceModalOpen(false);
         handleApplyPriceSource(source);
     };
     
-    const handleApplyLocalPriceSource = (itemId: string, source: RabDetailItem['priceSource']) => {
-        handleApplyPriceSource(source, [itemId]);
-    };
-
     const handleStartAhsCreationForMissing = (itemId: string) => {
         setIsMissingItemsModalOpen(false);
         handleManageAhs(itemId);
@@ -572,7 +841,8 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
             if (isNaN(val)) return '0';
             return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
         };
-        const formatVol = (val: number) => {
+        const formatVol = (val: number | null) => {
+            if (val === null) return '';
             return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val);
         };
         
@@ -584,9 +854,6 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
 
         const head = [['NO', 'URAIAN PEKERJAAN', 'SAT', 'VOL', 'HARGA SATUAN (Rp)', 'JUMLAH\n(Rp)', 'KETERANGAN']];
         
-        let categoryCounter = 0;
-        let itemCounter = 0;
-
         const displayedItems = showDeleted ? sourceItems : sourceItems.filter(item => !item.isDeleted);
 
         const body = displayedItems.map(item => {
@@ -595,25 +862,23 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
             if (item.isDeleted) uraianText = `(DIHAPUS) ${uraianText}`;
 
             let rowData;
+            const itemNumber = itemNumbers.get(item.id) || '';
             if (item.type === 'category') {
-                categoryCounter++;
-                itemCounter = 0;
                 rowData = [
-                    { content: romanize(categoryCounter), styles: boldStyle },
+                    { content: itemNumber, styles: boldStyle },
                     { content: uraianText, styles: boldStyle },
                     '', '', '',
                     { content: formatInt(categorySubtotals.get(item.id) || 0), styles: boldStyle },
                     { content: item.keterangan || '', styles: boldStyle }
                 ];
             } else {
-                itemCounter++;
                 rowData = [
-                    itemCounter.toString(),
+                    itemNumber,
                     uraianText,
                     item.satuan,
                     formatVol(item.volume),
                     formatInt(item.hargaSatuan),
-                    formatInt(item.volume * item.hargaSatuan),
+                    formatInt((item.volume || 0) * item.hargaSatuan),
                     item.keterangan || ''
                 ];
             }
@@ -621,6 +886,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
             (rowData as any).isNew = item.isNew;
             (rowData as any).isDeleted = item.isDeleted;
             (rowData as any).isCategory = item.type === 'category';
+            (rowData as any).indent = item.indent || 0;
             return rowData;
         });
 
@@ -632,10 +898,14 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
             headStyles: { fillColor: headerBgColor, textColor: defaultTextColor, fontStyle: 'bold', halign: 'center', valign: 'middle', fontSize: 7.5 },
             styles: { fontSize: 7.5, cellPadding: 2, valign: 'top', lineWidth: 0.1, lineColor: borderColor },
             columnStyles: {
-                0: { cellWidth: 8, halign: 'center' }, 1: { cellWidth: 65, halign: 'left' }, 2: { halign: 'center', cellWidth: 12 }, 3: { halign: 'right', cellWidth: 15 }, 4: { halign: 'right', cellWidth: 25 }, 5: { halign: 'right', cellWidth: 25 }, 6: { halign: 'left', cellWidth: 'auto' },
+                0: { cellWidth: 15, halign: 'center' }, 1: { cellWidth: 58, halign: 'left' }, 2: { halign: 'center', cellWidth: 12 }, 3: { halign: 'right', cellWidth: 15 }, 4: { halign: 'right', cellWidth: 25 }, 5: { halign: 'right', cellWidth: 25 }, 6: { halign: 'left', cellWidth: 'auto' },
             },
             didParseCell: (data) => {
                 const rawData = data.row.raw as any;
+
+                if(data.column.index === 1 && rawData.indent > 0) {
+                     data.cell.styles.cellPadding = { ...data.cell.styles.cellPadding as any, left: (data.cell.styles.cellPadding as any).left + rawData.indent * 4 };
+                }
 
                 if (rawData.isCategory) {
                     data.cell.styles.fillColor = categoryBgColor;
@@ -728,7 +998,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
         } else {
             return doc.output('datauristring');
         }
-    }, [rab, sourceItems, totalRAB, creatorName, approverName, workDuration, revisionText, categorySubtotals, showDeleted]);
+    }, [rab, sourceItems, totalRAB, creatorName, approverName, workDuration, revisionText, categorySubtotals, showDeleted, itemNumbers]);
 
 
     const handleSaveData = () => {
@@ -761,7 +1031,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
         const updatedRab: RabDocument = { 
             ...rab,
             isLocked: true, 
-            status: 'Terkunci',
+            status: 'Selesai',
             detailItems: detailItems.map(item => ({ ...item, isEditing: false, isSaved: true, isPricingLoading: false })),
             creatorName,
             approverName,
@@ -773,7 +1043,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
             setRabData(prevRabData => prevRabData.map(r => r.id === rabId ? updatedRab : r));
             setHasUnsavedChanges(false);
             setIsSubmitting(false);
-            toast.success('RAB berhasil dikunci!');
+            toast.success('RAB berhasil dikunci dan ditandai Selesai!');
         }, 300);
     };
 
@@ -822,6 +1092,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
                 error: 'Gagal membuat PDF.',
             }
         );
+        setIsFileActionsOpen(false);
     };
 
     const handleDownloadTemplate = () => {
@@ -913,7 +1184,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
                 toast.success('Data berhasil diimpor dari Excel!');
             } catch (error) {
                 console.error("Error parsing Excel file:", error);
-                toast.error("Gagal mengimpor file Excel. Pastikan formatnya benar.");
+                toast.error('Gagal mengimpor file Excel. Pastikan formatnya benar.');
             } finally {
                 if(event.target) event.target.value = '';
             }
@@ -985,8 +1256,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
 
     if (!rab) return <div className="text-center p-8 bg-gray-100 dark:bg-gray-900 h-screen flex items-center justify-center"><Loader2 className="animate-spin" size={32}/></div>;
     
-    let categoryCounter = 0; let itemCounter = 0;
-    const inlineInputClass = "bg-transparent border-b border-gray-400/50 dark:border-gray-500/50 focus:border-honda-red focus:ring-0 focus:outline-none p-0 mx-1";
+    const inlineInputClass = "bg-transparent border-b border-gray-400/50 dark:border-gray-500/50 focus:border-destructive focus:ring-0 focus:outline-none p-0 mx-1";
 
     return (
         <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 font-sans">
@@ -1008,7 +1278,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
                 isOpen={isMissingItemsModalOpen} 
                 onClose={handleCloseMissingItemsModal} 
                 missingItems={missingWorkItems} 
-                onStartAhsCreation={handleStartAhsCreationForMissing}
+                onStartAhsCreation={handleManageAhs}
                 onStartAhsCreationWithAi={handleStartAhsCreationWithAiForMissing}
             />
             <ApprovalModal 
@@ -1045,7 +1315,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
                                 value={revisionText}
                                 onChange={(e) => { setRevisionText(e.target.value); setHasUnsavedChanges(true); }}
                                 readOnly={effectiveIsLocked}
-                                className="bg-transparent border-b border-gray-400/50 dark:border-gray-500/50 focus:border-honda-red focus:ring-0 focus:outline-none p-0 mx-1 w-24 text-center text-xs italic read-only:border-transparent read-only:cursor-default"
+                                className="bg-transparent border-b border-gray-400/50 dark:border-gray-500/50 focus:border-destructive focus:ring-0 focus:outline-none p-0 mx-1 w-24 text-center text-xs italic read-only:border-transparent read-only:cursor-default"
                             />
                         </p>
                     </header>
@@ -1061,7 +1331,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
                                             onClick={() => setViewingRevisionIndex(index)}
                                             className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${
                                                 viewingRevisionIndex === index
-                                                    ? 'border-honda-red text-honda-red'
+                                                    ? 'border-destructive text-destructive'
                                                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:hover:text-gray-200 dark:hover:border-gray-500'
                                             }`}
                                         >
@@ -1073,7 +1343,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
                                     onClick={() => setViewingRevisionIndex('current')}
                                     className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${
                                         viewingRevisionIndex === 'current'
-                                            ? 'border-honda-red text-honda-red'
+                                            ? 'border-destructive text-destructive'
                                             : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:hover:text-gray-200 dark:hover:border-gray-500'
                                     }`}
                                 >
@@ -1088,9 +1358,9 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
                     <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-3">
                         <div className="flex items-center gap-2">
                             <button onClick={handleAddCategory} disabled={effectiveIsLocked} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-black dark:bg-gray-700 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-600 transition shadow disabled:bg-gray-400 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"><Plus size={14} /> Kategori</button>
-                            <button onClick={handleAddItem} disabled={effectiveIsLocked} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-honda-red rounded-lg hover:bg-red-700 transition shadow disabled:bg-gray-400 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"><Plus size={14} /> Baris</button>
+                            <button onClick={handleAddItem} disabled={effectiveIsLocked} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-destructive rounded-lg hover:bg-destructive/90 transition shadow disabled:bg-gray-400 dark:disabled:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"><Plus size={14} /> Baris</button>
                              <div className="flex items-center text-sm ml-4 border-l pl-4 dark:border-gray-600">
-                                <input type="checkbox" id="show-deleted" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-honda-red focus:ring-honda-red dark:bg-gray-700 dark:border-gray-600" />
+                                <input type="checkbox" id="show-deleted" checked={showDeleted} onChange={(e) => setShowDeleted(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-destructive focus:ring-destructive dark:bg-gray-700 dark:border-gray-600" />
                                 <label htmlFor="show-deleted" className="ml-2 text-gray-600 dark:text-gray-400 select-none cursor-pointer">
                                     Tampilkan item dihapus
                                 </label>
@@ -1121,7 +1391,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
                                             <Download size={14} /> Download Template
                                         </button>
                                         <button 
-                                            onClick={() => { handleExportPdf(); setIsFileActionsOpen(false); }} 
+                                            onClick={handleExportPdf}
                                             className="w-full text-left flex items-center gap-2 px-2 py-1.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
                                             <FileDown size={14} /> Export ke PDF
                                         </button>
@@ -1137,11 +1407,29 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
                         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                             <thead className="text-sm align-top text-gray-700 dark:text-gray-300 uppercase bg-gray-100 dark:bg-gray-700/50">
                                 <tr>
-                                    <th className="px-2 py-2 w-16 text-center font-semibold text-sm">No.</th><th className="px-2 py-2 min-w-[300px] font-semibold text-center text-sm">Uraian Pekerjaan</th><th className="px-2 py-2 w-24 text-center font-semibold text-sm">Sat</th><th className="px-2 py-2 w-28 text-center font-semibold text-sm">Vol</th><th className="px-2 py-2 w-40 text-center font-semibold text-sm">Harga Satuan</th><th className="px-2 py-2 w-44 text-center font-semibold text-sm">Jumlah</th><th className="px-2 py-2 min-w-[150px] font-semibold text-center text-sm">Keterangan</th><th className="px-2 py-2 w-20 text-center font-semibold text-sm">Edit</th><th className="px-2 py-2 w-32 text-center font-semibold text-sm">Sumber Harga</th>
+                                    <th className="px-2 py-2 w-16 text-center font-semibold text-sm">No.</th><th className="px-2 py-2 min-w-[300px] font-semibold text-center text-sm">Uraian Pekerjaan</th><th className="px-2 py-2 w-24 text-center font-semibold text-sm">Sat</th><th className="px-2 py-2 w-28 text-center font-semibold text-sm">Vol</th><th className="px-2 py-2 w-40 text-center font-semibold text-sm">Harga Satuan</th><th className="px-2 py-2 w-44 text-center font-semibold text-sm">Jumlah</th><th className="px-2 py-2 min-w-[150px] font-semibold text-center text-sm">Keterangan</th><th className="px-2 py-2 w-20 text-center font-semibold text-sm">AKSI</th><th className="px-2 py-2 w-32 text-center font-semibold text-sm">Sumber Harga</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {visibleItems.map((item, index) => { if(item.type === 'category') { categoryCounter++; itemCounter = 0; } else if(!item.isDeleted){ itemCounter++; } return <RabDetailRow key={item.id} item={item} categoryIndex={categoryCounter} itemIndex={itemCounter} rowIndex={sourceItems.findIndex(d => d.id === item.id)} totalRows={sourceItems.length} onUpdate={handleItemChange} onToggleDelete={handleToggleDeleteItem} onToggleEdit={handleToggleEdit} onSaveRow={handleSaveRow} onMove={handleMoveRow} onManageAhs={handleManageAhs} onApplyLocalPriceSource={handleApplyLocalPriceSource} categorySubtotals={categorySubtotals} isLocked={effectiveIsLocked} /> })}
+                                {visibleItems.map((item, index) => (
+                                    <RabDetailRow 
+                                        key={item.id} 
+                                        item={item}
+                                        itemNumberString={itemNumbers.get(item.id) || ''}
+                                        rowIndex={sourceItems.findIndex(d => d.id === item.id)} 
+                                        totalRows={sourceItems.length} 
+                                        onUpdate={handleItemChange} 
+                                        onToggleDelete={handleToggleDeleteItem} 
+                                        onToggleEdit={handleToggleEdit} 
+                                        onSaveRow={handleSaveRow} 
+                                        onMove={handleMoveRow} 
+                                        onManageAhs={handleManageAhs} 
+                                        onApplyLocalPriceSource={handleApplyLocalPriceSource}
+                                        categorySubtotals={categorySubtotals}
+                                        isLocked={effectiveIsLocked}
+                                        onAddSubItem={handleAddSubItem}
+                                     />
+                                 ))}
                             </tbody>
                         </table>
                     </div>
@@ -1195,7 +1483,7 @@ const RabDetail = ({ rabData, setRabData, priceDatabase, setPriceDatabase, workI
                                 <Send size={16} />
                                 <span>Kirim</span>
                             </button>
-                            <button onClick={handleSaveData} disabled={!hasUnsavedChanges || isSubmitting || effectiveIsLocked} className="flex-1 flex items-center justify-center gap-2 px-6 py-2 text-sm font-semibold text-white bg-honda-red rounded-lg hover:bg-red-700 transition shadow-lg hover:shadow-red-500/50 disabled:bg-gray-400 disabled:shadow-none disabled:cursor-not-allowed">
+                            <button onClick={handleSaveData} disabled={!hasUnsavedChanges || isSubmitting || effectiveIsLocked} className="flex-1 flex items-center justify-center gap-2 px-6 py-2 text-sm font-semibold text-white bg-destructive rounded-lg hover:bg-destructive/90 transition shadow-lg disabled:bg-gray-400 disabled:shadow-none disabled:cursor-not-allowed">
                                 {isSubmitting ? (
                                     <>
                                         <Loader2 size={16} className="animate-spin" />

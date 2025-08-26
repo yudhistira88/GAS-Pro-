@@ -14,16 +14,20 @@ interface StatusBadgeProps {
 
 const StatusBadge = ({ status }: StatusBadgeProps) => {
   const baseClasses = "px-2.5 py-1 text-xs font-semibold rounded-full inline-block tracking-wide";
-  const statusClasses = {
-    Completed: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
-    Approved: "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300",
-    'Menunggu Approval': "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
-    Pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
-    Rejected: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
-    Terkunci: "bg-slate-100 text-slate-800 dark:bg-slate-900/50 dark:text-slate-300",
+  
+  const statusClasses: Record<RabDocument['status'], string> = {
+    Selesai: "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300",
+    Approval: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300",
+    Survey: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300",
+    Diterima: "bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300",
+    Ditolak: "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+    'Pending': 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300',
+    'Menunggu Approval': 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300',
   };
+  
   return <span className={`${baseClasses} ${statusClasses[status]}`}>{status}</span>;
 };
+
 
 interface ActionMenuProps {
     rab: RabDocument;
@@ -80,10 +84,10 @@ const holidays = [
   "2024-09-16", "2024-12-25", "2024-12-26"
 ].map(d => new Date(d).toISOString().split('T')[0]);
 
-const calculateSla = (approvedDateStr: string | null, finishDateStr: string | null): number | string => {
-    if (!approvedDateStr || !finishDateStr) return '-';
+const calculateSla = (receivedDateStr: string | null, finishDateStr: string | null): number | string => {
+    if (!receivedDateStr || !finishDateStr) return '-';
 
-    const startDate = new Date(approvedDateStr);
+    const startDate = new Date(receivedDateStr);
     const endDate = new Date(finishDateStr);
 
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || endDate < startDate) {
@@ -125,20 +129,18 @@ const calculatePercentageDifference = (rabValue: number, tenderValue: number | n
     }
 
     const difference = ((tenderValue - rabValue) / rabValue) * 100;
-    const isPositive = difference > 0;
-    const isNegative = difference < 0;
-
-    const formattedValue = `${isPositive ? '+' : ''}${difference.toFixed(2)}%`.replace('.', ',');
+    const formattedValue = `${difference > 0 ? '+' : ''}${difference.toFixed(2)}%`.replace('.', ',');
     
     let colorClass = 'text-gray-800 dark:text-gray-100';
-    if (isPositive) {
+    if (difference <= 10) {
         colorClass = 'text-green-600 dark:text-green-400';
-    } else if (isNegative) {
+    } else { // difference > 10
         colorClass = 'text-red-600 dark:text-red-400';
     }
 
     return { value: formattedValue, color: colorClass };
 };
+
 
 const formatDateForRow = (dateString: string | null) => {
     if (!dateString) return '-';
@@ -151,7 +153,7 @@ interface RabDataContext {
   setRabData: React.Dispatch<React.SetStateAction<RabDocument[]>>;
 }
 
-const allStatuses: RabDocument['status'][] = ['Pending', 'Menunggu Approval', 'Terkunci', 'Approved', 'Rejected', 'Completed'];
+const allStatuses: RabDocument['status'][] = ['Survey', 'Approval', 'Diterima', 'Ditolak', 'Selesai', 'Pending', 'Menunggu Approval'];
 
 type SortKey = keyof RabDocument | 'sla' | 'no' | 'totalBudget' | 'percentageDifference';
 type SortOrder = 'asc' | 'desc';
@@ -161,6 +163,7 @@ const RabRow = React.memo(({ rab, index, onEdit, onDelete, onMove, totalRows } :
     
     const totalBudget = calculateRowTotalBudget(rab);
     const percentageDiff = calculatePercentageDifference(totalBudget, rab.tenderValue);
+    const slaValue = calculateSla(rab.receivedDate, rab.finishDate);
 
     return (
         <tr className={`group bg-white dark:bg-gray-800 border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors`}>
@@ -186,16 +189,24 @@ const RabRow = React.memo(({ rab, index, onEdit, onDelete, onMove, totalRows } :
             <td className="px-4 py-2 text-center text-xs">{rab.pic}</td>
             <td className="px-4 py-2">
                 <div className="grid grid-cols-[auto_1fr] gap-x-2 text-xs">
-                    <strong className="font-semibold text-gray-600 dark:text-gray-400 text-right">Diterima:</strong>
-                    <span className="text-left">{formatDateForRow(rab.receivedRejectedDate)}</span>
-                    <strong className="font-semibold text-gray-600 dark:text-gray-400 text-right">Disetujui:</strong>
-                    <span className="text-left">{formatDateForRow(rab.approvedDate)}</span>
-                    <strong className="font-semibold text-gray-600 dark:text-gray-400 text-right">Selesai:</strong>
+                    <strong className="font-semibold text-gray-600 dark:text-gray-400 text-right">Tgl. Survey:</strong>
+                    <span className="text-left">{formatDateForRow(rab.surveyDate)}</span>
+                    <strong className="font-semibold text-gray-600 dark:text-gray-400 text-right">Tgl. Diterima:</strong>
+                    <span className="text-left">{formatDateForRow(rab.receivedDate)}</span>
+                    <strong className="font-semibold text-gray-600 dark:text-gray-400 text-right">Tgl. Selesai:</strong>
                     <span className="text-left">{formatDateForRow(rab.finishDate)}</span>
                 </div>
             </td>
             <td className="px-4 py-2 text-center"><StatusBadge status={rab.status} /></td>
-            <td className="px-4 py-2 text-center font-medium text-xs">{calculateSla(rab.approvedDate, rab.finishDate)}</td>
+            <td className="px-4 py-2 text-center font-medium text-xs">
+                {rab.status === 'Selesai' && typeof slaValue === 'number' ? (
+                    <span className={slaValue <= 3 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                        {slaValue}
+                    </span>
+                ) : (
+                    slaValue
+                )}
+            </td>
             <td className="px-4 py-2 font-semibold text-gray-800 dark:text-gray-100 text-right text-xs">{formatCurrency(calculateRowTotalBudget(rab))}</td>
             <td className="px-4 py-2 font-semibold text-gray-800 dark:text-gray-100 text-right text-xs">{formatCurrency(rab.tenderValue)}</td>
             <td className={`px-4 py-2 font-semibold text-center text-xs ${percentageDiff.color}`}>{percentageDiff.value}</td>
@@ -214,7 +225,7 @@ const RabList = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRab, setEditingRab] = useState<RabDocument | null>(null);
   const [statusFilters, setStatusFilters] = useState<RabDocument['status'][]>([]);
-  const [dateFilters, setDateFilters] = useState({ received: { from: '', to: '' }, approved: { from: '', to: '' }, finish: { from: '', to: '' } });
+  const [dateFilters, setDateFilters] = useState({ survey: { from: '', to: '' }, received: { from: '', to: '' }, finish: { from: '', to: '' } });
   const [slaFilter, setSlaFilter] = useState({ min: '', max: '' });
   const [percentageFilter, setPercentageFilter] = useState({ min: '', max: '' });
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -238,8 +249,8 @@ const RabList = () => {
 
   const activeFilterCount = useMemo(() => {
     let count = statusFilters.length;
-    if (dateFilters.received.from) count++; if (dateFilters.received.to) count++; if (dateFilters.approved.from) count++;
-    if (dateFilters.approved.to) count++; if (dateFilters.finish.from) count++; if (dateFilters.finish.to) count++;
+    if (dateFilters.survey.from) count++; if (dateFilters.survey.to) count++; if (dateFilters.received.from) count++;
+    if (dateFilters.received.to) count++; if (dateFilters.finish.from) count++; if (dateFilters.finish.to) count++;
     if (slaFilter.min) count++; if (slaFilter.max) count++;
     if (percentageFilter.min) count++; if (percentageFilter.max) count++;
     return count;
@@ -259,9 +270,9 @@ const RabList = () => {
             if (range.to) { const toDate = new Date(range.to); toDate.setHours(0, 0, 0, 0); if (itemDate > toDate) return false; }
             return true;
         };
-        const matchesDates = checkDateRange(rab.receivedRejectedDate, dateFilters.received) && checkDateRange(rab.approvedDate, dateFilters.approved) && checkDateRange(rab.finishDate, dateFilters.finish);
+        const matchesDates = checkDateRange(rab.surveyDate, dateFilters.survey) && checkDateRange(rab.receivedDate, dateFilters.received) && checkDateRange(rab.finishDate, dateFilters.finish);
 
-        const slaValue = calculateSla(rab.approvedDate, rab.finishDate);
+        const slaValue = calculateSla(rab.receivedDate, rab.finishDate);
         const matchesSla = (() => {
             if (slaFilter.min === '' && slaFilter.max === '') return true;
             if (typeof slaValue !== 'number') return false; // Don't match if SLA is '-'
@@ -287,7 +298,7 @@ const RabList = () => {
     if (sortConfig) {
       data.sort((a, b) => {
         let aValue: any, bValue: any;
-        if (sortConfig.key === 'sla') { aValue = calculateSla(a.approvedDate, a.finishDate); bValue = calculateSla(b.approvedDate, b.finishDate); if (aValue === '-') aValue = -1; if (bValue === '-') bValue = -1; } 
+        if (sortConfig.key === 'sla') { aValue = calculateSla(a.receivedDate, a.finishDate); bValue = calculateSla(b.receivedDate, b.finishDate); if (aValue === '-') aValue = -1; if (bValue === '-') bValue = -1; } 
         else if (sortConfig.key === 'totalBudget') { aValue = calculateRowTotalBudget(a); bValue = calculateRowTotalBudget(b); } 
         else if (sortConfig.key === 'percentageDifference') {
             const aRab = calculateRowTotalBudget(a);
@@ -322,14 +333,14 @@ const RabList = () => {
   const handleOpenCreateModal = () => { setEditingRab(null); setIsModalOpen(true); };
   const handleOpenEditModal = useCallback((rab: RabDocument) => { setEditingRab(rab); setIsModalOpen(true); }, []);
   const handleStatusFilterChange = (status: RabDocument['status']) => { setStatusFilters(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]); };
-  const handleDateFilterChange = (type: 'received' | 'approved' | 'finish', field: 'from' | 'to', value: string) => { setDateFilters(prev => ({ ...prev, [type]: { ...prev[type], [field]: value, }, })); };
+  const handleDateFilterChange = (type: 'survey' | 'received' | 'finish', field: 'from' | 'to', value: string) => { setDateFilters(prev => ({ ...prev, [type]: { ...prev[type], [field]: value, }, })); };
   
   const handleDeleteRequest = useCallback((id: string) => { setItemToDelete(id); setIsConfirmOpen(true); }, []);
   const confirmDelete = () => { if (itemToDelete) { const newData = rabData.filter(rab => rab.id !== itemToDelete); setRabData(newData); toast.success('RAB berhasil dihapus.'); } setIsConfirmOpen(false); setItemToDelete(null); };
 
   const resetFilters = () => {
     setStatusFilters([]);
-    setDateFilters({ received: { from: '', to: '' }, approved: { from: '', to: '' }, finish: { from: '', to: '' } });
+    setDateFilters({ survey: { from: '', to: '' }, received: { from: '', to: '' }, finish: { from: '', to: '' } });
     setSlaFilter({ min: '', max: '' });
     setPercentageFilter({ min: '', max: '' });
     setIsFilterOpen(false);
@@ -400,21 +411,20 @@ const RabList = () => {
     const formatDate = (dateString: string | null) => dateString ? new Date(dateString).toLocaleDateString('id-ID') : '-';
 
     // Set Header
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
     doc.text("Monitoring RAB", 14, 15);
-    doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
     doc.text("Rekapitulasi Rencana Anggaran Biaya Proyek", 14, 22);
 
     const statusColors: { [key in RabDocument['status']]: { bg: number[], text: number[] } } = {
-        Completed: { bg: [220, 252, 231], text: [22, 101, 52] }, // green
-        Approved:  { bg: [224, 242, 254], text: [7, 89, 133] },   // sky
-        'Menunggu Approval': { bg: [238, 242, 255], text: [67, 56, 202] }, // indigo
-        Pending:   { bg: [254, 249, 195], text: [133, 77, 14] },  // yellow
-        Rejected:  { bg: [254, 226, 226], text: [153, 27, 27] }, // red
-        Terkunci: { bg: [241, 245, 249], text: [51, 65, 85] }, // slate
+        Selesai: { bg: [220, 252, 231], text: [22, 101, 52] },
+        Diterima: { bg: [224, 242, 254], text: [7, 89, 133] },
+        Ditolak: { bg: [254, 226, 226], text: [153, 27, 27] },
+        Approval: { bg: [238, 242, 255], text: [67, 56, 202] },
+        Survey: { bg: [254, 249, 195], text: [133, 77, 14] },
+        'Pending': { bg: [255, 247, 237], text: [154, 52, 18] },
+        'Menunggu Approval': { bg: [245, 243, 255], text: [91, 33, 182] },
     };
+
 
     const head = [['NO', 'EMPR', 'URAIAN PROJECT', 'PIC', 'TIMELINE', 'STATUS', 'SLA (HARI KERJA)', 'NILAI RAB', 'NILAI TENDER', '% SELISIH', 'KETERANGAN']];
     const body = sortedAndFilteredData.map((rab, index) => {
@@ -425,9 +435,9 @@ const RabList = () => {
             rab.eMPR,
             rab.projectName,
             rab.pic,
-            `Diterima: ${formatDate(rab.receivedRejectedDate)}\nDisetujui: ${formatDate(rab.approvedDate)}\nSelesai: ${formatDate(rab.finishDate)}`,
+            `Survey: ${formatDate(rab.surveyDate)}\nDiterima: ${formatDate(rab.receivedDate)}\nSelesai: ${formatDate(rab.finishDate)}`,
             rab.status,
-            calculateSla(rab.approvedDate, rab.finishDate),
+            calculateSla(rab.receivedDate, rab.finishDate),
             formatCurrency(calculateRowTotalBudget(rab)),
             formatCurrency(rab.tenderValue),
             percentageDiff.value,
@@ -441,11 +451,11 @@ const RabList = () => {
         body: body,
         theme: 'grid',
         headStyles: {
-            fillColor: [243, 244, 246], // Light gray background, matching UI (gray-100)
-            textColor: [55, 65, 81],    // Dark gray text, matching UI (gray-700)
+            fillColor: [243, 244, 246], 
+            textColor: [55, 65, 81],    
             fontStyle: 'bold',
-            lineColor: [209, 213, 219], // Gray border color (gray-300)
-            lineWidth: 0.1,             // Explicitly set border width
+            lineColor: [209, 213, 219], 
+            lineWidth: 0.1,             
         },
         styles: {
             font: 'helvetica',
@@ -454,65 +464,47 @@ const RabList = () => {
             valign: 'middle'
         },
         columnStyles: {
-            0: { cellWidth: 8, halign: 'center' },
-            1: { cellWidth: 20, halign: 'center' },
-            2: { cellWidth: 45, halign: 'left' },
-            3: { cellWidth: 15, halign: 'center' },
-            4: { cellWidth: 28, halign: 'left' },
-            5: { cellWidth: 20, halign: 'center' },
-            6: { cellWidth: 15, halign: 'center' },
-            7: { cellWidth: 25, halign: 'right' },
-            8: { cellWidth: 25, halign: 'right' },
-            9: { cellWidth: 18, halign: 'center' },
-            10: { cellWidth: 'auto', halign: 'left' }
+            0: { cellWidth: 8, halign: 'center' }, 1: { cellWidth: 20, halign: 'center' }, 2: { cellWidth: 45, halign: 'left' }, 3: { cellWidth: 15, halign: 'center' }, 4: { cellWidth: 28, halign: 'left' }, 5: { cellWidth: 20, halign: 'center' }, 6: { cellWidth: 15, halign: 'center' }, 7: { cellWidth: 25, halign: 'right' }, 8: { cellWidth: 25, halign: 'right' }, 9: { cellWidth: 18, halign: 'center' }, 10: { cellWidth: 'auto', halign: 'left' }
         },
         willDrawCell: (data) => {
             if (data.section === 'head') {
                 data.cell.styles.halign = 'center';
             }
-             // Colorize '% Selisih' column text dynamically
              if (data.section === 'body' && data.column.index === 9) {
                 const rab = sortedAndFilteredData[data.row.index];
                 const totalBudget = calculateRowTotalBudget(rab);
                 const tenderValue = rab.tenderValue;
-                
-                // Set default text color first
                 data.cell.styles.textColor = [55, 65, 81];
-
                 if (totalBudget > 0 && tenderValue !== null) {
                     const difference = ((tenderValue - totalBudget) / totalBudget) * 100;
-                    if (difference > 0) {
-                        data.cell.styles.textColor = [22, 163, 74]; // Green for positive
-                    } else if (difference < 0) {
-                        data.cell.styles.textColor = [220, 38, 38]; // Red for negative
+                    if (difference > 10) {
+                        data.cell.styles.textColor = [220, 38, 38]; // Red
+                    } else {
+                        data.cell.styles.textColor = [22, 163, 74]; // Green
                     }
                 }
             }
         },
         didDrawCell: (data) => {
-            // Draw status badges
             if (data.section === 'body' && data.column.index === 5) {
                 const status = data.cell.raw as RabDocument['status'];
-                if (statusColors[status]) {
-                    const { bg, text } = statusColors[status];
+                const finalColors = statusColors[status];
+                const text = status;
+
+                if (finalColors) {
+                    const { bg, text: textColor } = finalColors;
                     const { x, y, width, height } = data.cell;
-                    
-                    const textWidth = doc.getStringUnitWidth(status) * (data.cell.styles.fontSize || 7) / doc.internal.scaleFactor;
-                    const badgeWidth = textWidth + 4; // padding
+                    const textWidth = doc.getStringUnitWidth(text) * (data.cell.styles.fontSize || 7) / doc.internal.scaleFactor;
+                    const badgeWidth = textWidth + 4;
                     const badgeHeight = 5;
                     const badgeX = x + (width - badgeWidth) / 2;
                     const badgeY = y + (height - badgeHeight) / 2;
-
                     doc.setFillColor(bg[0], bg[1], bg[2]);
                     doc.roundedRect(badgeX, badgeY, badgeWidth, badgeHeight, 1.5, 1.5, 'F');
-                    
                     doc.setFontSize(7);
                     doc.setFont('helvetica', 'bold');
-                    doc.setTextColor(text[0], text[1], text[2]);
-                    doc.text(status, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2, {
-                        align: 'center',
-                        baseline: 'middle'
-                    });
+                    doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+                    doc.text(text, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2, { align: 'center', baseline: 'middle' });
                 }
             }
         }
@@ -553,17 +545,17 @@ const RabList = () => {
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-3">
                         <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-100">Timeline</h4>
                         <div>
-                           <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Tgl. Diterima</label>
+                           <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Tgl. Survey</label>
                            <div className="grid grid-cols-2 gap-2 mt-1">
-                               <input type="date" value={dateFilters.received.from} onChange={e => handleDateFilterChange('received', 'from', e.target.value)} className={dateInputClasses} placeholder="From"/>
-                               <input type="date" value={dateFilters.received.to} onChange={e => handleDateFilterChange('received', 'to', e.target.value)} className={dateInputClasses} placeholder="To"/>
+                               <input type="date" value={dateFilters.survey.from} onChange={e => handleDateFilterChange('survey', 'from', e.target.value)} className={dateInputClasses} placeholder="From"/>
+                               <input type="date" value={dateFilters.survey.to} onChange={e => handleDateFilterChange('survey', 'to', e.target.value)} className={dateInputClasses} placeholder="To"/>
                            </div>
                         </div>
                         <div>
-                           <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Tgl. Disetujui</label>
+                           <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Tgl. Diterima</label>
                            <div className="grid grid-cols-2 gap-2 mt-1">
-                               <input type="date" value={dateFilters.approved.from} onChange={e => handleDateFilterChange('approved', 'from', e.target.value)} className={dateInputClasses} />
-                               <input type="date" value={dateFilters.approved.to} onChange={e => handleDateFilterChange('approved', 'to', e.target.value)} className={dateInputClasses} />
+                               <input type="date" value={dateFilters.received.from} onChange={e => handleDateFilterChange('received', 'from', e.target.value)} className={dateInputClasses} />
+                               <input type="date" value={dateFilters.received.to} onChange={e => handleDateFilterChange('received', 'to', e.target.value)} className={dateInputClasses} />
                            </div>
                         </div>
                          <div>

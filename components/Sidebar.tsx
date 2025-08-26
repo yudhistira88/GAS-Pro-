@@ -51,7 +51,7 @@ const SidebarContent = () => {
                 </NavLink>
                 )}
                 <NavLink to="/project" icon={<Briefcase className="h-5 w-5" />}>
-                Project
+                Proyek
                 </NavLink>
             </nav>
             <div className="mt-auto p-4 border-t border-border text-center text-xs text-muted-foreground">

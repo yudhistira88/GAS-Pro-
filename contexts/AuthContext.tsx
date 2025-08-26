@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   currentUser: User | null;
-  login: (email: string, pass: string) => boolean;
+  login: (identifier: string, pass: string) => boolean;
   logout: () => void;
   updateCurrentUser: (updatedUser: User) => void;
 }
@@ -37,8 +37,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [currentUser]);
 
-  const login = (email: string, pass: string): boolean => {
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  const login = (identifier: string, pass: string): boolean => {
+    const user = users.find(u => 
+        u.email.toLowerCase() === identifier.toLowerCase() ||
+        u.username.toLowerCase() === identifier.toLowerCase()
+    );
     
     // Special case for initial login
     if(user?.email === 'admin@proyekku.com' && pass === '12345' && !user.password) {
